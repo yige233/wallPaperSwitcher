@@ -96,7 +96,32 @@ namespace WallpaperApp {
                         string p1 = Path.Combine(targetDir, "wp1.jpg");
                         string p2 = Path.Combine(targetDir, "wp2.jpg");
                         
-                        bmp.Save(p1, ImageFormat.Jpeg);
+                        // --- 高质量 JPEG 保存逻辑 ---
+                        // 1. 获取 GDI+ 中的 JPEG 编码器
+                        ImageCodecInfo jpegEncoder = null;
+                        foreach (ImageCodecInfo codec in ImageCodecInfo.GetImageEncoders()) {
+                            if (codec.MimeType == "image/jpeg") {
+                                jpegEncoder = codec;
+                                break;
+                            }
+                        }
+                        if (jpegEncoder != null) {
+                            // 2. 创建编码器参数
+                            //    Encoder.Quality 是一个 Guid，用于指定我们要设置的是“质量”
+                            System.Drawing.Imaging.Encoder qualityEncoder = System.Drawing.Imaging.Encoder.Quality;
+                            
+                            // 3. 创建参数容器，并放入我们的参数
+                            //    设置质量为 95L (L 表示 long 类型)。范围是 0-100。
+                            EncoderParameters encoderParameters = new EncoderParameters(1);
+                            encoderParameters.Param[0] = new EncoderParameter(qualityEncoder, 95L);
+
+                            // 4. 使用高级 Save 方法保存
+                            bmp.Save(p1, jpegEncoder, encoderParameters);
+
+                        } else {
+                            // 如果找不到编码器 (极不可能)，回退到默认质量
+                            bmp.Save(p1, ImageFormat.Jpeg);
+                        }
                         
                         // --- 符号链接逻辑 (mklink.exe) ---
                         bool linkSuccess = false;
