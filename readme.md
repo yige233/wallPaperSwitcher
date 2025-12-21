@@ -8,36 +8,50 @@
 
 这个程序的特别之处在于，它是从 web 获取壁纸而非本地文件夹，也就是说我可以配置好一个随机壁纸 API，本地就不用存储那么多的图片了。我的笔记本也可以使用该 API 获取壁纸，节省笔记本的存储空间。甚至于都不需要壁纸，假设有一个 pixiv 图片 API（）
 
-其实从 web 获取壁纸也不稀奇，主要是没找到过这个功能和幻灯片播放壁纸相结合的工具，就只能想办法手搓了() 其实也不是手搓的，99%的代码都来源于 Gemini 3 Pro
+其实从 web 获取壁纸也不稀奇，主要是没找到过这个功能和幻灯片播放壁纸相结合的工具，就只能想办法手搓了() 其实也不是手搓的，90%(大概)的代码都来源于 Gemini 3 Pro
 
 ## 使用方法
 
-在 powershell 中以管理员身份运行安装脚本：
+``` bash
+用法: WallpaperApp [参数]
 
-```powershell
-.\install.ps1 -ImageUrl "http://localhost/random-picture?302" -IntervalSeconds 60 -BasePath "D:\wallPaper-switcher"
+参数:
+-c, --config [<path>=<value>]   修改配置文件。如果不添加第二个参数，则是打开配置文件。
+-s, --switch                    手动切换壁纸。
+-q, --quit                      退出正在运行的后台服务。
+-h, --help                      显示帮助。
+
+不使用任何参数，即为启动后台服务。
 ```
 
-其中：
+首次不带参数启动（双击运行）时，会生成一个`config.ini`文件。编辑完成后再次启动，就会根据配置文件启动后台服务了。也可以通过`WS_CONFIG`环境变量指定配置文件路径。
 
-`-ImageUrl`为图片的 URL，配置一个返回随机壁纸图像的 URL，就可以做到随机切换壁纸了。总之就是下一张壁纸是什么，完全取决于该 URL 返回的图片。
-
-`-IntervalSeconds`为图片切换间隔，以秒为单位。
-
-`-BasePath`为图片保存路径。需要是一个文件夹。
-
-脚本会生成 `config.ini`、生成一个`下一个壁纸`快捷方式、编译出一个`WallpaperApp.exe`，并创建一个计划任务用来运行该程序。创建计划任务需要管理员权限。
+另外，直接运行`tool.ps1`，可以打开一个交互式菜单，可以在其中创建\删除自动启动的计划任务。
 
 ## 配置文件
 
 ```ini
 [Settings]
-ImageUrl=http://localhost/random-picture?302
+# 要存放壁纸的文件夹路径。
+BasePath=D:\\wallPaperSwitcher
+# 壁纸图片的URL。配置一个返回随机壁纸图像的 URL，就可以做到随机切换壁纸了。总之就是下一张壁纸是什么，完全取决于该 URL 返回的图片。
+ImageUrl=https://localhost/random-picture?302
+# 是否同时将当前壁纸设为锁屏壁纸。
+LockScreen=true
+# 壁纸切换间隔（秒）。
 IntervalSeconds=60
-BasePath=D:\wallPaper-switcher
-Log=false
+# 用户空闲时间（秒）。超过该时间后，将停止切换壁纸。
+IdleThresholdSeconds=600
+# 是否启用日志。
+Log=true
+# 转换后的图像质量（0-100）。
+JPGQuality=95
+# 当前壁纸使用的槽位。不要自行修改。
 CurrentSlot=Slot_1
-
 ```
 
-其中 `Log` 为是否记录日志，默认为 `false`。不要修改 `CurrentSlot`，该项是用于存储当前正在使用的壁纸文件夹。
+其中`BasePath`和`ImageUrl`是必填，且修改后需要重启服务。其他配置项不需要重启也可以生效。
+
+## 编译
+
+非常简单，执行`compile.ps1`即可，不需要安装任何东西。就是通过powershell调用Windows系统上都有的`csc.exe`。从未感到编译如此简单（
