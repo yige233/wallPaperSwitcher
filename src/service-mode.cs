@@ -7,7 +7,7 @@ using System.Windows.Forms;
 
 namespace WallpaperSwitcher
 {
-    partial class Program
+    partial class App
     {
         static Mutex appMutex;
         public static void RunServiceMode()
@@ -68,7 +68,7 @@ namespace WallpaperSwitcher
                                     int retryAfter;
                                     int.TryParse(Config.Read("RetryAfter"), out retryAfter);
                                     Interval = retryAfter;
-                                    Log(NextSlotName + " 未就绪，放弃切换壁纸。预计将在 " + retryAfter + " 秒后重试。");
+                                    Log(NextSlotName + "未就绪，放弃切换壁纸。预计将在 " + retryAfter + " 秒后重试。");
                                     goto AwaitSignal;
                                 }
                             }
@@ -81,6 +81,7 @@ namespace WallpaperSwitcher
                             if (enableLockScreen)
                             {
                                 if (!File.Exists(WallpaperPath)) { Log("文件不存在：" + WallpaperPath + " ，无法将其设置为锁屏壁纸。"); }
+                                if (Image.IsExtraFormat(Image.GetImageFormat(WallpaperPath))) { Log(WallpaperPath + " 为webp格式图片，无法将其设置为锁屏壁纸。"); }
                                 else { LockScreen.SetWallpaper(WallpaperPath); }
                             }
                             // 交换变量
@@ -102,7 +103,7 @@ namespace WallpaperSwitcher
                     }
                 }
             }
-            catch (Exception ex) { Log("FATAL: " + ex.ToString()); }
+            catch (Exception ex) { Log("FATAL: " + ex.ToString(), true); }
         }
     }
 }

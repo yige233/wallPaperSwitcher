@@ -132,7 +132,7 @@ namespace WallpaperSwitcher
             void Close();
         }
     };
-    partial class Program
+    partial class App
     {
         static bool PrepareWallpaper(string targetDir, string url)
         {
@@ -149,7 +149,7 @@ namespace WallpaperSwitcher
             try
             {
                 if (!Directory.Exists(targetDir)) { Directory.CreateDirectory(targetDir); }
-                if (!DownloadImage(url, p1, jpgQuality)) { return false; }
+                if (!Image.SaveImage(url, p1, jpgQuality)) { return false; }
                 if (!Win32.CreateSymbolicLink(p2, p1, Win32.SYMBOLIC_LINK_FLAG_FILE | Win32.SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE))
                 {
                     if (!Win32.CreateHardLink(p2, p1, IntPtr.Zero))
@@ -161,7 +161,7 @@ namespace WallpaperSwitcher
                 return true;
             }
             catch (Exception ex)
-            { Log("准备壁纸失败: " + ex.Message); return false; }
+            { Log("准备壁纸失败: " + ex, true); return false; }
         }
 
     }

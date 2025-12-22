@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Net;
 using System.Text;
 using System.Threading;
 using System.Reflection;
@@ -10,7 +11,7 @@ using System.Runtime.InteropServices;
 
 namespace WallpaperSwitcher
 {
-    partial class Program
+    partial class App
     {
         public static string AppName = "WallpaperSwitcher";
         public static string SwitchEventName = "Global\\" + AppName + "SwitchEventSignal";
@@ -42,6 +43,7 @@ namespace WallpaperSwitcher
                 new ConfigItem("LockScreen", "是否同时将当前壁纸设为锁屏壁纸。", "true"),
                 new ConfigItem("IntervalSeconds", "壁纸切换间隔（秒）。", "300"),
                 new ConfigItem("IdleThresholdSeconds", "用户空闲时间（秒）。超过该时间后，将停止切换壁纸。", "3600"),
+                new ConfigItem("ExtraFormat", "允许作为桌面壁纸的图像格式。支持webp,heic,avif。若包含多个值，使用英文逗号分隔。"),
                 new ConfigItem("Log", "是否启用日志。", "false"),
                 new ConfigItem("JPGQuality", "转换后的图像质量（0-100）。", "95"),
                 new ConfigItem("RetryAfter", "后台准备壁纸失败后，重试的间隔（秒）。","60"),
@@ -50,13 +52,15 @@ namespace WallpaperSwitcher
                 // 2. 初始化 Config 类
                 Config.Init(ConfigPath, configSchema, "Settings");
 
+                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+                _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(AppName + "/" + Assembly.GetExecutingAssembly().GetName().Version);
                 string flag = args.Length > 0 ? args[0] : "";
                 string value = args.Length > 1 ? args[1] : "";
                 if (flag == "-c" || flag == "--config")
                 {
                     if (value == "")
                     {
-                        Console.WriteLine(Config.Text());
+                        Console.WriteLine("\n" + Config.Text());
                         return;
                     }
 

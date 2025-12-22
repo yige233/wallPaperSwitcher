@@ -1,12 +1,10 @@
 ﻿using System;
 using System.IO;
 using System.Text;
-using System.Drawing;
 using System.Net.Http;
 using System.Threading;
 using System.Diagnostics;
 using System.Windows.Forms;
-using System.Drawing.Imaging;
 using System.Security.Principal;
 using System.Runtime.InteropServices;
 
@@ -50,7 +48,7 @@ namespace WallpaperSwitcher
             }
             catch (System.ComponentModel.Win32Exception)
             {
-                MessageBox.Show(errorText, Program.AppName + " - 需要管理员权限", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(errorText, App.AppName + " - 需要管理员权限", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
         public static bool IsUserBusy()
@@ -205,8 +203,6 @@ namespace WallpaperSwitcher
                 finally { _initDone.Set(); }
             }
         }
-
-
         [DllImport("user32.dll")]
         private static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
         [DllImport("user32.dll", SetLastError = true)]
@@ -268,7 +264,7 @@ namespace WallpaperSwitcher
         private const uint WM_KEYDOWN = 0x0100;
         private const int VK_RETURN = 0x0D;
     };
-    partial class Program
+    partial class App
     {
         public static string GetConfigFilePath()
         {
@@ -282,10 +278,15 @@ namespace WallpaperSwitcher
             }
             return Path.Combine(BaseDir, "config.ini");
         }
-        public static void Log(string msg = "")
+        public static void Log(string msg = "", bool forceLog = false)
         {
             string line = "[" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "] " + msg;
             if (isConsole) { Console.WriteLine(line); }
+            if (forceLog)
+            {
+                File.AppendAllText(LogPath, line + "\r\n");
+                return;
+            }
             try
             {
                 bool enableLog;
@@ -297,49 +298,27 @@ namespace WallpaperSwitcher
         }
 
         private static readonly HttpClient _httpClient = new HttpClient();
-        // 辅助方法：获取编码器
-        private static ImageCodecInfo GetEncoder(ImageFormat format)
+        public static byte[] Download(string url)
         {
-            ImageCodecInfo[] codecs = ImageCodecInfo.GetImageEncoders();
-            foreach (ImageCodecInfo codec in codecs)
-            {
-                if (codec.FormatID == format.Guid) return codec;
-            }
-            return null;
-        }
-        static bool DownloadImage(string url, string savePath, long jpgQuality = 95L)
-        {
-            bool success = false;
             try
             {
-                string requestUrl = url + "&t=" + DateTime.Now.Ticks;
-                HttpResponseMessage response = _httpClient.GetAsync(requestUrl).Result;
+                HttpResponseMessage response = _httpClient.GetAsync(url).Result;
                 response.EnsureSuccessStatusCode();
                 string finalUrl = response.RequestMessage.RequestUri.ToString();
-                Log("下载URL：" + finalUrl);
-                byte[] data = response.Content.ReadAsByteArrayAsync().Result;
-
-                using (MemoryStream ms = new MemoryStream(data))
-                using (Bitmap bmp = new Bitmap(ms))
-                {
-                    ImageCodecInfo jpegEncoder = null;
-                    foreach (ImageCodecInfo codec in ImageCodecInfo.GetImageEncoders()) { if (codec.MimeType == "image/jpeg") { jpegEncoder = codec; break; } }
-                    try { File.Delete(savePath); } catch { }
-                    if (jpegEncoder != null)
-                    {
-                        System.Drawing.Imaging.Encoder qualityEncoder = System.Drawing.Imaging.Encoder.Quality;
-                        EncoderParameters encoderParameters = new EncoderParameters(1);
-                        encoderParameters.Param[0] = new EncoderParameter(qualityEncoder, jpgQuality);
-                        bmp.Save(savePath, jpegEncoder, encoderParameters);
-                    }
-                    else { bmp.Save(savePath, ImageFormat.Jpeg); }
-                }
-
-                success = true;
-                return true;
+                Log("真实URL：" + finalUrl);
+                return response.Content.ReadAsByteArrayAsync().Result;
             }
-            catch (Exception ex) { Log("下载 " + url + " 失败: " + ex.Message); return false; }
-            finally { if (success) { GC.Collect(); GC.WaitForPendingFinalizers(); } }
+            catch (AggregateException ae)
+            {
+                Log("下载 " + url + " 失败: " + ae.Message, true);
+                foreach (var ex in ae.InnerExceptions)
+                {
+                    Log(string.Format("下载异常(内部): {0} - {1}", ex.GetType().Name, ex.Message), true);
+                    if (ex.InnerException != null) { Log(string.Format("  -> 根源: {0}", ex.InnerException.Message), true); }
+                }
+                return null;
+            }
+
         }
     }
 }
