@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Text;
 using System.Drawing;
@@ -14,10 +14,6 @@ namespace WallpaperSwitcher
 {
     public static class Win32
     {
-        [DllImport("kernel32", CharSet = CharSet.Unicode)]
-        public static extern int GetPrivateProfileString(string section, string key, string def, StringBuilder retVal, int size, string filePath);
-        [DllImport("kernel32", CharSet = CharSet.Unicode)]
-        public static extern int WritePrivateProfileString(string section, string key, string val, string filePath);
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         [return: MarshalAs(UnmanagedType.I1)]
         public static extern bool CreateSymbolicLink(string lpSymlinkFileName, string lpTargetFileName, int dwFlags);
@@ -274,9 +270,6 @@ namespace WallpaperSwitcher
     };
     partial class Program
     {
-        static string BaseDir = Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName);
-        static string LogPath = Path.Combine(BaseDir, "debug.log");
-        static string ConfigPath = GetConfigFilePath();
         public static string GetConfigFilePath()
         {
             string envPath = Environment.GetEnvironmentVariable("WS_CONFIG");
@@ -295,24 +288,15 @@ namespace WallpaperSwitcher
             if (isConsole) { Console.WriteLine(line); }
             try
             {
-                bool enableLog = false;
-                bool.TryParse(ReadIni("Log", "false"), out enableLog);
+                bool enableLog;
+                bool.TryParse(Config.Read("Log"), out enableLog);
                 if (!enableLog) return;
                 File.AppendAllText(LogPath, line + "\r\n");
             }
             catch { }
         }
 
-        static string ReadIni(string key, string defVal)
-        {
-            StringBuilder sb = new StringBuilder(1024);
-            Win32.GetPrivateProfileString("Settings", key, defVal, sb, 1024, ConfigPath);
-            return sb.ToString().Trim();
-        }
-
-        static void WriteIni(string key, string val) { Win32.WritePrivateProfileString("Settings", key, val, ConfigPath); }
         private static readonly HttpClient _httpClient = new HttpClient();
-
         // 辅助方法：获取编码器
         private static ImageCodecInfo GetEncoder(ImageFormat format)
         {

@@ -5,6 +5,7 @@ using System.Threading;
 using System.Reflection;
 using System.Diagnostics;
 using System.Windows.Forms;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
 namespace WallpaperSwitcher
@@ -14,7 +15,9 @@ namespace WallpaperSwitcher
         public static string AppName = "WallpaperSwitcher";
         public static string SwitchEventName = "Global\\" + AppName + "SwitchEventSignal";
         public static string QuitEventName = "Global\\" + AppName + "QuitEventSignal";
-
+        static string BaseDir = Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName);
+        static string LogPath = Path.Combine(BaseDir, "debug.log");
+        static string ConfigPath = GetConfigFilePath();
         public static bool isConsole = Win32.AttachConsole(Win32.ATTACH_PARENT_PROCESS);
         static void ManualSwitchWallpaper()
         {
@@ -26,44 +29,40 @@ namespace WallpaperSwitcher
             try { using (var wh = EventWaitHandle.OpenExisting(QuitEventName)) { wh.Set(); } }
             catch { }
         }
-        static void InitConfig()
-        {
-            string config = @"[Settings]
-# 要存放壁纸的文件夹路径。
-BasePath=
-# 壁纸图片的URL。
-ImageUrl=
-# 是否同时将当前壁纸设为锁屏壁纸。
-LockScreen=true
-# 壁纸切换间隔（秒）。
-IntervalSeconds=300
-# 用户空闲时间（秒）。超过该时间后，将停止切换壁纸。
-IdleThresholdSeconds=3600
-# 是否启用日志。
-Log=false
-# 转换后的图像质量（0-100）。
-JPGQuality=95
-# 当前壁纸使用的槽位。不要自行修改。
-CurrentSlot=Slot_1
-";
-
-            File.WriteAllText(ConfigPath, config, Encoding.Unicode);
-            Process.Start(ConfigPath);
-        }
         [STAThread]
         static void Main(string[] args)
         {
             try
             {
+                // 1. 定义配置大纲 (Schema)
+                var configSchema = new List<ConfigItem>()
+                {
+                new ConfigItem("BasePath", "要存放壁纸的文件夹路径。"),
+                new ConfigItem("ImageUrl", "壁纸图片的URL。"),
+                new ConfigItem("LockScreen", "是否同时将当前壁纸设为锁屏壁纸。", "true"),
+                new ConfigItem("IntervalSeconds", "壁纸切换间隔（秒）。", "300"),
+                new ConfigItem("IdleThresholdSeconds", "用户空闲时间（秒）。超过该时间后，将停止切换壁纸。", "3600"),
+                new ConfigItem("Log", "是否启用日志。", "false"),
+                new ConfigItem("JPGQuality", "转换后的图像质量（0-100）。", "95"),
+                new ConfigItem("RetryAfter", "后台准备壁纸失败后，重试的间隔（秒）。","60"),
+                new ConfigItem("CurrentSlot", "当前壁纸使用的槽位。不要自行修改。")
+                };
+                // 2. 初始化 Config 类
+                Config.Init(ConfigPath, configSchema, "Settings");
+
                 string flag = args.Length > 0 ? args[0] : "";
                 string value = args.Length > 1 ? args[1] : "";
                 if (flag == "-c" || flag == "--config")
                 {
-                    if (value == "") { Process.Start(ConfigPath); return; }
+                    if (value == "")
+                    {
+                        Console.WriteLine(Config.Text());
+                        return;
+                    }
 
                     string configName = value.Split('=')[0];
                     string ConfigValue = value.Split('=')[1];
-                    WriteIni(configName, ConfigValue);
+                    Config.Write(configName, ConfigValue);
 
                     return;
                 }

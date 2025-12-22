@@ -1,109 +1,105 @@
-<#
+ï»¿<#
 .SYNOPSIS
-    WallpaperApp Î¬»¤¹¤¾ß½Å±¾
+    WallpaperApp ç»´æŠ¤å·¥å…·è„šæœ¬
 .DESCRIPTION
-    ÓÃÓÚ¹ÜÀíËøÆÁ×Ô¶¯ÇĞ»»·şÎñµÄ°²×°¡¢Ğ¶ÔØ¡¢Æô¶¯ÒÔ¼°´´½¨¿ì½İ·½Ê½¡£
+    ç”¨äºç®¡ç†é”å±è‡ªåŠ¨åˆ‡æ¢æœåŠ¡çš„å®‰è£…ã€å¸è½½ã€å¯åŠ¨ä»¥åŠåˆ›å»ºå¿«æ·æ–¹å¼ã€‚
 #>
 
 # ==========================================
-# 1. ×Ô¶¯ÌáÈ¨¼ì²â
+# 1. è‡ªåŠ¨ææƒæ£€æµ‹
 # ==========================================
 $CurrentIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $Principal = [Security.Principal.WindowsPrincipal]$CurrentIdentity
 if (-not $Principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-Host "ÕıÔÚÇëÇó¹ÜÀíÔ±È¨ÏŞÒÔÖ´ĞĞÎ¬»¤²Ù×÷..." -ForegroundColor Yellow
+    Write-Host "æ­£åœ¨è¯·æ±‚ç®¡ç†å‘˜æƒé™ä»¥æ‰§è¡Œç»´æŠ¤æ“ä½œ..." -ForegroundColor Yellow
     Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
     exit
 }
 
 # ==========================================
-# 2. ÅäÖÃ±äÁ¿
+# 2. é…ç½®å˜é‡
 # ==========================================
 $WorkDir = $PSScriptRoot
 $ExeName = "WallpaperApp.exe"
 $ExePath = Join-Path $WorkDir $ExeName
 $TaskName = "WallpaperSwitcher"
-$ShortcutName = "ÏÂÒ»ÕÅ±ÚÖ½.lnk"
+$ShortcutName = "ä¸‹ä¸€å¼ å£çº¸.lnk"
 
-# ¼ì²é¿ÉÖ´ĞĞÎÄ¼şÊÇ·ñ´æÔÚ
+# æ£€æŸ¥å¯æ‰§è¡Œæ–‡ä»¶æ˜¯å¦å­˜åœ¨
 if (-not (Test-Path $ExePath)) {
-    Write-Host "´íÎó: ÔÚµ±Ç°Ä¿Â¼ÏÂÕÒ²»µ½ $ExeName" -ForegroundColor Red
-    Write-Host "ÇëÈ·±£±¾½Å±¾Óë³ÌĞòÔÚÍ¬Ò»ÎÄ¼ş¼ĞÄÚ¡£"
-    Read-Host "°´»Ø³µ¼üÍË³ö..."
+    Write-Host "é”™è¯¯: åœ¨å½“å‰ç›®å½•ä¸‹æ‰¾ä¸åˆ° $ExeName" -ForegroundColor Red
+    Write-Host "è¯·ç¡®ä¿æœ¬è„šæœ¬ä¸ç¨‹åºåœ¨åŒä¸€æ–‡ä»¶å¤¹å†…ã€‚"
+    Read-Host "æŒ‰å›è½¦é”®é€€å‡º..."
     exit
 }
 
 # ==========================================
-# 3. ¹¦ÄÜº¯Êı
+# 3. åŠŸèƒ½å‡½æ•°
 # ==========================================
 
 function Install-ServiceTask {
-    Write-Host "`nÕıÔÚ´´½¨¼Æ»®ÈÎÎñ..." -ForegroundColor Cyan
+    Write-Host "`næ­£åœ¨åˆ›å»ºè®¡åˆ’ä»»åŠ¡..." -ForegroundColor Cyan
     try {
-        # ¶¨Òå²Ù×÷£ºÆô¶¯ EXE (ÎŞ²ÎÊı)
+        # å®šä¹‰æ“ä½œï¼šå¯åŠ¨ EXE (æ— å‚æ•°)
         $Action = New-ScheduledTaskAction -Execute $ExePath -WorkingDirectory $WorkDir
         
-        # ¶¨Òå´¥·¢Æ÷£ºÓÃ»§µÇÂ¼Ê±
+        # å®šä¹‰è§¦å‘å™¨ï¼šç”¨æˆ·ç™»å½•æ—¶
         $Trigger = New-ScheduledTaskTrigger -AtLogon
         
-        # ±ØĞëÊÇµ±Ç°ÓÃ»§£¬·ñÔòÎŞ·¨ĞŞ¸Ä¸ÃÓÃ»§µÄËøÆÁÅäÖÃ
+        # å¿…é¡»æ˜¯å½“å‰ç”¨æˆ·ï¼Œå¦åˆ™æ— æ³•ä¿®æ”¹è¯¥ç”¨æˆ·çš„é”å±é…ç½®
         $Principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive
         
-        # ¶¨ÒåÉèÖÃ£ºÔÊĞíÊ¹ÓÃµç³ØÆô¶¯£¬²»ÒòÎªÔËĞĞÊ±¼ä¹ı³¤¶øÍ£Ö¹
+        # å®šä¹‰è®¾ç½®ï¼šå…è®¸ä½¿ç”¨ç”µæ± å¯åŠ¨ï¼Œä¸å› ä¸ºè¿è¡Œæ—¶é—´è¿‡é•¿è€Œåœæ­¢
         $Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit 0
         
-        # ×¢²áÈÎÎñ (Èç¹û´æÔÚÔò¸²¸Ç)
-        Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger -Principal $Principal -Settings $Settings -Force | Out-Null
+        $Description = (Get-ChildItem $ExePath).VersionInfo.Comments
+
+        # æ³¨å†Œä»»åŠ¡ (å¦‚æœå­˜åœ¨åˆ™è¦†ç›–)
+        Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger -Principal $Principal -Settings $Settings -Description $Description -Force | Out-Null
         
-        Write-Host "¡Ì ¼Æ»®ÈÎÎñ [$TaskName] ´´½¨³É¹¦£¡" -ForegroundColor Green
-        Write-Host "   ³ÌĞò½«ÔÚÄúÃ¿´ÎµÇÂ¼Ê±×Ô¶¯ºóÌ¨ÔËĞĞ¡£"
+        Write-Host "âˆš è®¡åˆ’ä»»åŠ¡ [$TaskName] åˆ›å»ºæˆåŠŸï¼" -ForegroundColor Green
+        Write-Host "   ç¨‹åºå°†åœ¨æ‚¨æ¯æ¬¡ç™»å½•æ—¶è‡ªåŠ¨åå°è¿è¡Œã€‚"
     }
     catch {
-        Write-Error "´´½¨Ê§°Ü: $_"
+        Write-Error "åˆ›å»ºå¤±è´¥: $_"
     }
 }
 
 function Remove-ServiceTask {
-    Write-Host "`nÕıÔÚÉ¾³ı¼Æ»®ÈÎÎñ..." -ForegroundColor Cyan
+    Write-Host "`næ­£åœ¨åˆ é™¤è®¡åˆ’ä»»åŠ¡..." -ForegroundColor Cyan
     if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
         try {
             Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
-            Write-Host "¡Ì ¼Æ»®ÈÎÎñÒÑÉ¾³ı¡£" -ForegroundColor Green
-            
-            # Ë³±ã³¢ÊÔÍ£Ö¹ÕıÔÚÔËĞĞµÄ½ø³Ì
-            $Proc = Get-Process -Name "WallpaperApp" -ErrorAction SilentlyContinue
-            if ($Proc) {
-                Stop-Process -InputObject $Proc -Force
-                Write-Host "   ÒÑÍ£Ö¹ÕıÔÚÔËĞĞµÄÊµÀı¡£" -ForegroundColor Gray
-            }
+            Write-Host "âˆš è®¡åˆ’ä»»åŠ¡å·²åˆ é™¤ã€‚" -ForegroundColor Green
+            Stop-ServiceProcess
         }
         catch {
-            Write-Error "É¾³ıÊ§°Ü: $_"
+            Write-Error "åˆ é™¤å¤±è´¥: $_"
         }
     }
     else {
-        Write-Host "¡Á Î´ÕÒµ½ÃûÎª [$TaskName] µÄÈÎÎñ¡£" -ForegroundColor Yellow
+        Write-Host "Ã— æœªæ‰¾åˆ°åä¸º [$TaskName] çš„ä»»åŠ¡ã€‚" -ForegroundColor Yellow
     }
 }
 
 function Start-ServiceTask {
-    Write-Host "`nÕıÔÚÆô¶¯¼Æ»®ÈÎÎñ..." -ForegroundColor Cyan
+    Write-Host "`næ­£åœ¨å¯åŠ¨è®¡åˆ’ä»»åŠ¡..." -ForegroundColor Cyan
     if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
         try {
             Start-ScheduledTask -TaskName $TaskName
-            Write-Host "¡Ì ÈÎÎñÒÑ´¥·¢Æô¶¯¡£" -ForegroundColor Green
+            Write-Host "âˆš ä»»åŠ¡å·²è§¦å‘å¯åŠ¨ã€‚" -ForegroundColor Green
         }
         catch {
-            Write-Error "Æô¶¯Ê§°Ü: $_"
+            Write-Error "å¯åŠ¨å¤±è´¥: $_"
         }
     }
     else {
-        Write-Host "¡Á ÈÎÎñ²»´æÔÚ£¬ÇëÏÈÖ´ĞĞ°²×°²Ù×÷¡£" -ForegroundColor Red
+        Write-Host "Ã— ä»»åŠ¡ä¸å­˜åœ¨ï¼Œè¯·å…ˆæ‰§è¡Œå®‰è£…æ“ä½œã€‚" -ForegroundColor Red
     }
 }
 
 function New-Shortcut {
-    Write-Host "`nÕıÔÚ´´½¨×ÀÃæ¿ì½İ·½Ê½..." -ForegroundColor Cyan
+    Write-Host "`næ­£åœ¨åˆ›å»ºæ¡Œé¢å¿«æ·æ–¹å¼..." -ForegroundColor Cyan
     try {
         $WshShell = New-Object -ComObject WScript.Shell
         $DesktopPath = [Environment]::GetFolderPath("Desktop")
@@ -111,48 +107,61 @@ function New-Shortcut {
         
         $Shortcut = $WshShell.CreateShortcut($LnkPath)
         $Shortcut.TargetPath = $ExePath
-        $Shortcut.Arguments = "-s"  # ¹Ø¼ü£ºÌí¼Ó -s ²ÎÊıÓÃÓÚÊÖ¶¯ÇĞ»»
+        $Shortcut.Arguments = "-s"  # å…³é”®ï¼šæ·»åŠ  -s å‚æ•°ç”¨äºæ‰‹åŠ¨åˆ‡æ¢
         $Shortcut.WorkingDirectory = $WorkDir
-        $Shortcut.WindowStyle = 7   # 7 = ×îĞ¡»¯ (Minimize)£¬±ÜÃâµ¯´°ÉÁË¸
-        $Shortcut.IconLocation = $ExePath # Ê¹ÓÃ EXE ×ÔÉíµÄÍ¼±ê
-        $Shortcut.Description = "ÇĞ»»µ½ÏÂÒ»ÕÅ±ÚÖ½"
+        $Shortcut.WindowStyle = 7   # 7 = æœ€å°åŒ– (Minimize)ï¼Œé¿å…å¼¹çª—é—ªçƒ
+        $Shortcut.IconLocation = $ExePath # ä½¿ç”¨ EXE è‡ªèº«çš„å›¾æ ‡
+        $Shortcut.Description = "åˆ‡æ¢åˆ°ä¸‹ä¸€å¼ å£çº¸"
         $Shortcut.Save()
         
-        Write-Host "¡Ì ¿ì½İ·½Ê½ [$ShortcutName] ÒÑ´´½¨µ½×ÀÃæ¡£" -ForegroundColor Green
+        Write-Host "âˆš å¿«æ·æ–¹å¼ [$ShortcutName] å·²åˆ›å»ºåˆ°æ¡Œé¢ã€‚" -ForegroundColor Green
     }
     catch {
-        Write-Error "´´½¨Ê§°Ü: $_"
+        Write-Error "åˆ›å»ºå¤±è´¥: $_"
+    }
+}
+
+function Stop-ServiceProcess {
+    Write-Host "`næ­£åœ¨åœæ­¢æœåŠ¡..." -ForegroundColor Cyan
+    try {
+        Start-Process -FilePath $ExePath -ArgumentList "-q" -NoNewWindow -Wait
+        Write-Host "? åœæ­¢æŒ‡ä»¤å·²å‘é€ã€‚" -ForegroundColor Green
+    }
+    catch {
+        Write-Error "åœæ­¢å¤±è´¥: $_"
     }
 }
 
 # ==========================================
-# 4. Ö÷²Ëµ¥Ñ­»·
+# 4. ä¸»èœå•å¾ªç¯
 # ==========================================
 
 Clear-Host
 while ($true) {
     Write-Host "========================================" -ForegroundColor Cyan
-    Write-Host "    WallpaperSwitcher - ¹ÜÀíÃæ°å"
+    Write-Host "    WallpaperSwitcher - ç®¡ç†é¢æ¿"
     Write-Host "========================================" -ForegroundColor Cyan
-    Write-Host "µ±Ç°Â·¾¶: $ExePath" -ForegroundColor Gray
+    Write-Host "å½“å‰è·¯å¾„: $ExePath" -ForegroundColor Gray
     Write-Host ""
-    Write-Host "1. °²×°/ĞŞ¸´ ·şÎñ (´´½¨¿ª»ú×ÔÆôÈÎÎñ)"
-    Write-Host "2. Æô¶¯ ·şÎñ (Èç¹ûÒÑ°²×°)"
-    Write-Host "3. Ğ¶ÔØ ·şÎñ (É¾³ıÈÎÎñ²¢Í£Ö¹½ø³Ì)"
-    Write-Host "4. ´´½¨ `¡°ÏÂÒ»ÕÅ±ÚÖ½`¡± ×ÀÃæ¿ì½İ·½Ê½"
-    Write-Host "Q. ÍË³ö"
+    Write-Host "1. å®‰è£…/ä¿®å¤ æœåŠ¡ (åˆ›å»ºå¼€æœºè‡ªå¯ä»»åŠ¡)"
+    Write-Host "2. å¯åŠ¨ æœåŠ¡ (å¦‚æœå·²å®‰è£…)"
+    Write-Host "3. å¸è½½ æœåŠ¡ (åˆ é™¤ä»»åŠ¡å¹¶åœæ­¢è¿›ç¨‹)"
+    Write-Host "4. åˆ›å»º `â€œä¸‹ä¸€å¼ å£çº¸`â€ æ¡Œé¢å¿«æ·æ–¹å¼"
+    Write-Host "5. åœæ­¢ æœåŠ¡ (å‘é€é€€å‡ºä¿¡å·)"
+    Write-Host "Q. é€€å‡º"
     Write-Host ""
     
-    $Selection = Read-Host "ÇëÑ¡Ôñ²Ù×÷ [1-4, Q]"
+    $Selection = Read-Host "è¯·é€‰æ‹©æ“ä½œ [1-4, Q]"
     Clear-Host
     switch ($Selection) {
-        "1" { Install-ServiceTask; Start-ServiceTask } # °²×°ºó×Ô¶¯Æô¶¯
+        "1" { Install-ServiceTask; Start-ServiceTask } # å®‰è£…åè‡ªåŠ¨å¯åŠ¨
         "2" { Start-ServiceTask }
         "3" { Remove-ServiceTask }
         "4" { New-Shortcut }
+        "5" { Stop-ServiceProcess } # æ–°å¢çš„åŠŸèƒ½
         "Q" { exit }
         "q" { exit }
-        Default { Write-Host "ÎŞĞ§ÊäÈë£¬ÇëÖØÊÔ¡£" -ForegroundColor Yellow }
+        Default { Write-Host "æ— æ•ˆè¾“å…¥ï¼Œè¯·é‡è¯•ã€‚" -ForegroundColor Yellow }
     }
     
     Write-Host ""

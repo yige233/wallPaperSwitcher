@@ -141,8 +141,8 @@ namespace WallpaperSwitcher
             try { File.Delete(p1); } catch { }
             try { File.Delete(p2); } catch { }
 
-            long jpgQuality = 95L;
-            long.TryParse(ReadIni("JPGQuality", "95"), out jpgQuality);
+            long jpgQuality;
+            long.TryParse(Config.Read("JPGQuality"), out jpgQuality);
             if (jpgQuality < 0) jpgQuality = 0;
             if (jpgQuality > 100) jpgQuality = 100;
 

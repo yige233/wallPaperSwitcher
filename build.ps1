@@ -1,12 +1,12 @@
-# ¶¨Òå×ÓÂ·¾¶ (Ê¹ÓÃ Join-Path Ç°È·±£ ScriptRoot ²»Îª¿Õ£¬ËäÈ»ÉÏÃæÒÑ¾­±£Ö¤ÁË)
+ï»¿# å®šä¹‰å­è·¯å¾„ (ä½¿ç”¨ Join-Path å‰ç¡®ä¿ ScriptRoot ä¸ä¸ºç©ºï¼Œè™½ç„¶ä¸Šé¢å·²ç»ä¿è¯äº†)
 $SourceDir = Join-Path $PSScriptRoot "src"
 $IconPath = Join-Path $PSScriptRoot "icon.ico"
 $OutputPath = Join-Path $PSScriptRoot "WallpaperApp.exe"
 
 if (-not (Test-Path $SourceDir)) {
-    Write-Error "ÑÏÖØ´íÎó: ÕÒ²»µ½Ô´ÂëÄ¿Â¼"
-    Write-Error "ÆÚ´ıÂ·¾¶: $SourceDir"
-    Write-Error "ÇëÈ·±£ÄãÔÚÏîÄ¿¸ùÄ¿Â¼ÏÂ£¬²¢ÇÒ´´½¨ÁË 'src' ÎÄ¼ş¼Ğ¡£"
+    Write-Error "ä¸¥é‡é”™è¯¯: æ‰¾ä¸åˆ°æºç ç›®å½•"
+    Write-Error "æœŸå¾…è·¯å¾„: $SourceDir"
+    Write-Error "è¯·ç¡®ä¿ä½ åœ¨é¡¹ç›®æ ¹ç›®å½•ä¸‹ï¼Œå¹¶ä¸”åˆ›å»ºäº† 'src' æ–‡ä»¶å¤¹ã€‚"
     exit 1
 }
 
@@ -15,48 +15,48 @@ Start-Sleep -Milliseconds 500
 if (Test-Path $OutputPath) { Remove-Item $OutputPath -Force }
 
 
-# »ñÈ¡ËùÓĞ .cs ÎÄ¼ş
+# è·å–æ‰€æœ‰ .cs æ–‡ä»¶
 $SourceFiles = @(Get-ChildItem -Path $SourceDir -Filter *.cs | Select-Object -ExpandProperty FullName)
 
 if ($SourceFiles.Count -eq 0) {
-    Write-Error "´íÎó: ÔÚ $SourceDir ÏÂÃ»ÕÒµ½ÈÎºÎ .cs ÎÄ¼ş¡£"
+    Write-Error "é”™è¯¯: åœ¨ $SourceDir ä¸‹æ²¡æ‰¾åˆ°ä»»ä½• .cs æ–‡ä»¶ã€‚"
     exit 1
 }
 
-Write-Host "¼ì²âµ½ $($SourceFiles.Count) ¸öÔ´ÂëÎÄ¼ş£¬×¼±¸±àÒë..." -ForegroundColor Cyan
+Write-Host "æ£€æµ‹åˆ° $($SourceFiles.Count) ä¸ªæºç æ–‡ä»¶ï¼Œå‡†å¤‡ç¼–è¯‘..." -ForegroundColor Cyan
 
 $CodeProvider = New-Object Microsoft.CSharp.CSharpCodeProvider
 $Params = New-Object System.CodeDom.Compiler.CompilerParameters
 
-# Éú³É EXE
+# ç”Ÿæˆ EXE
 $Params.GenerateExecutable = $true
 $Params.OutputAssembly = $OutputPath
 
-# Ìí¼ÓÒıÓÃ (¾²Ä¬Ìí¼Ó)
+# æ·»åŠ å¼•ç”¨ (é™é»˜æ·»åŠ )
 [void]$Params.ReferencedAssemblies.Add("System.dll")
 [void]$Params.ReferencedAssemblies.Add("System.Core.dll")
 [void]$Params.ReferencedAssemblies.Add("System.Drawing.dll")
 [void]$Params.ReferencedAssemblies.Add("System.Net.Http.dll")
 [void]$Params.ReferencedAssemblies.Add("System.Windows.Forms.dll")
 
-# ±àÒë²ÎÊı
-# /target:winexe : ÎŞ¿ØÖÆÌ¨´°¿Ú
-# /optimize+     : ÓÅ»¯´úÂë
+# ç¼–è¯‘å‚æ•°
+# /target:winexe : æ— æ§åˆ¶å°çª—å£
+# /optimize+     : ä¼˜åŒ–ä»£ç 
 $CompilerOptions = "/target:winexe /optimize+"
 
 if (Test-Path $IconPath) {
-    Write-Host "¼¯³ÉÍ¼±ê: $IconPath" -ForegroundColor Gray
+    Write-Host "é›†æˆå›¾æ ‡: $IconPath" -ForegroundColor Gray
     $CompilerOptions += " /win32icon:`"$IconPath`""
 }
 
 $Params.CompilerOptions = $CompilerOptions
 
 try {
-    # Ç¿ÖÆ×ª»»ÎÄ¼şÁĞ±íÎª string[]£¬·ÀÖ¹ÀàĞÍ°ó¶¨´íÎó
+    # å¼ºåˆ¶è½¬æ¢æ–‡ä»¶åˆ—è¡¨ä¸º string[]ï¼Œé˜²æ­¢ç±»å‹ç»‘å®šé”™è¯¯
     $Results = $CodeProvider.CompileAssemblyFromFile($Params, [string[]]$SourceFiles)
 
     if ($Results.Errors.HasErrors) {
-        Write-Error "`n±àÒëÊ§°Ü£¡ÏêÇéÈçÏÂ£º"
+        Write-Error "`nç¼–è¯‘å¤±è´¥ï¼è¯¦æƒ…å¦‚ä¸‹ï¼š"
         foreach ($Err in $Results.Errors) {
             $FileName = Split-Path $Err.FileName -Leaf
             $Msg = "[{0}:{1}] {2}" -f $FileName, $Err.Line, $Err.ErrorText
@@ -71,14 +71,14 @@ try {
     }
     else {
         Write-Host "`n================================"
-        Write-Host "    ±àÒë³É¹¦£¡" -ForegroundColor Green
+        Write-Host "    ç¼–è¯‘æˆåŠŸï¼" -ForegroundColor Green
         Write-Host "================================"
-        Write-Host "Êä³öÎÄ¼ş: $OutputPath"
+        Write-Host "è¾“å‡ºæ–‡ä»¶: $OutputPath"
     }
 }
 catch {
-    Write-Error "±àÒëÆ÷ÄÚ²¿´íÎó: $_"
+    Write-Error "ç¼–è¯‘å™¨å†…éƒ¨é”™è¯¯: $_"
 }
 finally {
-    Read-Host -Prompt "°´Enter¼üÍË³ö"
+    Read-Host -Prompt "æŒ‰Enteré”®é€€å‡º"
 }

@@ -46,6 +46,8 @@ IdleThresholdSeconds=600
 Log=true
 # 转换后的图像质量（0-100）。
 JPGQuality=95
+# 后台准备壁纸失败后，重试的间隔（秒）。
+RetryAfter=60
 # 当前壁纸使用的槽位。不要自行修改。
 CurrentSlot=Slot_1
 ```
