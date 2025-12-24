@@ -50,6 +50,11 @@ namespace WallpaperSwitcher
 
             if (_isInternalChange) { return; }
             if (DateTime.Now.Subtract(_lastUserEventTime).TotalMilliseconds < 1000) return;
+
+            // 我们严格限制回调响应此事件的场景：一定是ShellWindow获得焦点时，才允许响应此事件
+            IntPtr hWnd = SystemUtils.GetForegroundWindow();
+            if (hWnd != SystemUtils.GetShellWindow()) return;
+
             _lastUserEventTime = DateTime.Now;
 
             if (_onUserActionCallback != null) _onUserActionCallback();

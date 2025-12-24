@@ -82,8 +82,7 @@ namespace WallpaperSwitcher
             GetClassName(hWnd, sb, sb.Capacity);
             string className = sb.ToString();
 
-            // WorkerW / Progman = 桌面背景
-            // Shell_TrayWnd = 任务栏
+            // WorkerW / Progman = 桌面背景 Shell_TrayWnd = 任务栏
             return className == "WorkerW" || className == "Progman" || className == "Shell_TrayWnd";
         }
         public static bool IsMonitorActive() { return MonitorStateWatcher.IsScreenOn; }
@@ -185,9 +184,9 @@ namespace WallpaperSwitcher
         private struct POWERBROADCAST_SETTING { public Guid PowerSetting; public int DataLength; [MarshalAs(UnmanagedType.ByValArray, SizeConst = 1)] public byte[] Data; }
 
         [DllImport("user32.dll")]
-        private static extern IntPtr GetForegroundWindow();
+        public static extern IntPtr GetForegroundWindow();
         [DllImport("user32.dll")]
-        private static extern IntPtr GetShellWindow();
+        public static extern IntPtr GetShellWindow();
         [DllImport("user32.dll")]
         public static extern bool IsZoomed(IntPtr hWnd);
         [DllImport("user32.dll")]

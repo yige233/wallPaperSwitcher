@@ -41,6 +41,7 @@ namespace WallpaperSwitcher
                     while (true)
                     {
                         int.TryParse(Config.Read("IntervalSeconds"), out Interval);
+                        if (Interval < 10) { Interval = 10; }
                         try
                         {
                             int UserIdleThresholdSeconds;
