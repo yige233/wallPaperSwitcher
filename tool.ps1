@@ -23,7 +23,6 @@ $WorkDir = $PSScriptRoot
 $ExeName = "WallpaperApp.exe"
 $ExePath = Join-Path $WorkDir $ExeName
 $TaskName = "WallpaperSwitcher"
-$ShortcutName = "下一张壁纸.lnk"
 
 # 检查可执行文件是否存在
 if (-not (Test-Path $ExePath)) {
@@ -40,16 +39,16 @@ if (-not (Test-Path $ExePath)) {
 function Install-ServiceTask {
     Write-Host "`n正在创建计划任务..." -ForegroundColor Cyan
     try {
-        # 定义操作：启动 EXE (无参数)
+        # 定义操作: 启动 EXE (无参数)
         $Action = New-ScheduledTaskAction -Execute $ExePath -WorkingDirectory $WorkDir
         
-        # 定义触发器：用户登录时
+        # 定义触发器: 用户登录时
         $Trigger = New-ScheduledTaskTrigger -AtLogon
         
         # 必须是当前用户，否则无法修改该用户的锁屏配置
         $Principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive
         
-        # 定义设置：允许使用电池启动，不因为运行时间过长而停止
+        # 定义设置: 允许使用电池启动，不因为运行时间过长而停止
         $Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit 0
         
         $Description = (Get-ChildItem $ExePath).VersionInfo.Comments
@@ -98,34 +97,11 @@ function Start-ServiceTask {
     }
 }
 
-function New-Shortcut {
-    Write-Host "`n正在创建桌面快捷方式..." -ForegroundColor Cyan
-    try {
-        $WshShell = New-Object -ComObject WScript.Shell
-        $DesktopPath = [Environment]::GetFolderPath("Desktop")
-        $LnkPath = Join-Path $DesktopPath $ShortcutName
-        
-        $Shortcut = $WshShell.CreateShortcut($LnkPath)
-        $Shortcut.TargetPath = $ExePath
-        $Shortcut.Arguments = "-s"  # 关键：添加 -s 参数用于手动切换
-        $Shortcut.WorkingDirectory = $WorkDir
-        $Shortcut.WindowStyle = 7   # 7 = 最小化 (Minimize)，避免弹窗闪烁
-        $Shortcut.IconLocation = $ExePath # 使用 EXE 自身的图标
-        $Shortcut.Description = "切换到下一张壁纸"
-        $Shortcut.Save()
-        
-        Write-Host "√ 快捷方式 [$ShortcutName] 已创建到桌面。" -ForegroundColor Green
-    }
-    catch {
-        Write-Error "创建失败: $_"
-    }
-}
-
 function Stop-ServiceProcess {
     Write-Host "`n正在停止服务..." -ForegroundColor Cyan
     try {
         Start-Process -FilePath $ExePath -ArgumentList "-q" -NoNewWindow -Wait
-        Write-Host "? 停止指令已发送。" -ForegroundColor Green
+        Write-Host "√ 停止指令已发送。" -ForegroundColor Green
     }
     catch {
         Write-Error "停止失败: $_"
@@ -139,15 +115,13 @@ function Stop-ServiceProcess {
 Clear-Host
 while ($true) {
     Write-Host "========================================" -ForegroundColor Cyan
-    Write-Host "    WallpaperSwitcher - 管理面板"
+    Write-Host "    WallpaperSwitcher - 安装/卸载计划任务"
     Write-Host "========================================" -ForegroundColor Cyan
     Write-Host "当前路径: $ExePath" -ForegroundColor Gray
     Write-Host ""
     Write-Host "1. 安装/修复 服务 (创建开机自启任务)"
     Write-Host "2. 启动 服务 (如果已安装)"
     Write-Host "3. 卸载 服务 (删除任务并停止进程)"
-    Write-Host "4. 创建 `“下一张壁纸`” 桌面快捷方式"
-    Write-Host "5. 停止 服务 (发送退出信号)"
     Write-Host "Q. 退出"
     Write-Host ""
     
@@ -157,8 +131,6 @@ while ($true) {
         "1" { Install-ServiceTask; Start-ServiceTask } # 安装后自动启动
         "2" { Start-ServiceTask }
         "3" { Remove-ServiceTask }
-        "4" { New-Shortcut }
-        "5" { Stop-ServiceProcess } # 新增的功能
         "Q" { exit }
         "q" { exit }
         Default { Write-Host "无效输入，请重试。" -ForegroundColor Yellow }

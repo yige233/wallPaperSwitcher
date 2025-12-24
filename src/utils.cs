@@ -297,14 +297,14 @@ namespace WallpaperSwitcher
         public static void Log(string format, params object[] args)
         {
             if (!LogEnabled()) return;
-            string line = string.Format(format, args);
+            string line = FormatLog(format, args);
             if (isConsole) { Console.WriteLine(line); }
             File.AppendAllText(LogPath, line + "\r\n");
         }
 
         public static void LogForce(string format, params object[] args)
         {
-            string line = string.Format(format, args);
+            string line = FormatLog(format, args);
             if (isConsole) { Console.WriteLine(line); }
             File.AppendAllText(LogPath, line + "\r\n");
         }

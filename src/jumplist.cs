@@ -9,16 +9,16 @@ namespace WallpaperSwitcher
 {
     public static class JumpListInjector
     {
-        public static void Run(string exePath)
+        public static void Run()
         {
             // 必须在 STA 线程中运行 WPF 逻辑
-            Thread t = new Thread(() => RunInternal(exePath));
+            Thread t = new Thread(() => RunInternal());
             t.SetApartmentState(ApartmentState.STA);
             t.Start();
             t.Join();
         }
 
-        private static void RunInternal(string exePath)
+        private static void RunInternal()
         {
             try
             {
@@ -62,13 +62,15 @@ namespace WallpaperSwitcher
                 object jumpItemsCollection = tJumpList.GetProperty("JumpItems").GetValue(listInstance, null);
                 System.Collections.IList jumpItemsList = jumpItemsCollection as System.Collections.IList;
 
-                object taskSwitch = CreateTask(tJumpTask, "启动/切换下一张壁纸", "立即更换锁屏壁纸", exePath, null, null);
-                object taskConfig = CreateTask(tJumpTask, "编辑配置", "打开并编辑配置文件", exePath, "-c", null);
-                object taskQuit = CreateTask(tJumpTask, "停止服务", "停止后台运行中的服务", exePath, "-q", null);
-                object taskAbout = CreateTask(tJumpTask, "关于", string.Format("关于{0}", App.AppName), App.GithubURL, null, null);
+                object taskSwitch = CreateTask(tJumpTask, "启动/切换下一张壁纸", "立即更换锁屏壁纸", App.ExecutablePath);
+                object taskConfig = CreateTask(tJumpTask, "编辑配置", "打开并编辑配置文件", App.GetConfigFilePath());
+                object taskOpenLog = CreateTask(tJumpTask, "打开日志", "打开日志文件", App.LogPath);
+                object taskQuit = CreateTask(tJumpTask, "停止服务", "停止后台运行中的服务", App.ExecutablePath, "-q");
+                object taskAbout = CreateTask(tJumpTask, "关于", string.Format("关于{0}", App.AppName), App.GithubURL);
 
                 jumpItemsList.Add(taskSwitch);
                 jumpItemsList.Add(taskConfig);
+                jumpItemsList.Add(taskOpenLog);
                 jumpItemsList.Add(taskQuit);
                 jumpItemsList.Add(taskAbout);
 

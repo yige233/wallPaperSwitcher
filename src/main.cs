@@ -21,8 +21,9 @@ namespace WallpaperSwitcher
         public static string SwitchEventName = string.Format("Global\\{0}SwitchEventSignal", AppName);
         public static string QuitEventName = string.Format("Global\\{0}QuitEventSignal", AppName);
         public static string ServiceMutex = string.Format("Global\\{0}ServiceMutex", AppName);
-        static string BaseDir = Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName);
-        static string LogPath = Path.Combine(BaseDir, AppName + ".log");
+        public static string ExecutablePath = Process.GetCurrentProcess().MainModule.FileName;
+        public static string BaseDir = Path.GetDirectoryName(ExecutablePath);
+        public static string LogPath = Path.Combine(BaseDir, AppName + ".log");
         static string ConfigPath = GetConfigFilePath();
         static Mutex appMutex;
         public static bool isConsole = Win32.AttachConsole(Win32.ATTACH_PARENT_PROCESS);
@@ -94,7 +95,7 @@ namespace WallpaperSwitcher
                 }
                 if (flag == "-j" || flag == "--jumplist")
                 {
-                    JumpListInjector.Run(Process.GetCurrentProcess().MainModule.FileName);
+                    JumpListInjector.Run();
                     return;
                 }
                 if (flag == "-h" || flag == "--help")
