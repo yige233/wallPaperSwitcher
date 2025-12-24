@@ -9,19 +9,10 @@ namespace WallpaperSwitcher
 {
     partial class App
     {
-        static Mutex appMutex;
         public static void RunServiceMode()
         {
             try
             {
-                // 确保只有一个实例运行，以及配置文件存在
-                bool createdNew;
-                appMutex = new Mutex(true, "Global\\" + AppName + "ServiceMutex", out createdNew);
-                if (!createdNew)
-                {
-                    MessageBox.Show("已经存在一个正在运行的" + AppName + "。", AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
                 // 确保关键配置项存在
                 string BasePathRaw = Config.Read("BasePath");
                 string ImageUrl = Config.Read("ImageUrl");
@@ -93,7 +84,7 @@ namespace WallpaperSwitcher
                             if (!PrepareWallpaper((NextSlotName == "Slot_1") ? Slot1 : Slot2, ImageUrl)) { Log("后台预加载 " + NextSlotName + " 未完成。将在下个周期重试。"); }
 
                         }
-                        catch (Exception loopEx) { Log("壁纸切换时出现错误：" + loopEx.Message); goto AwaitSignal; }
+                        catch (Exception loopEx) { Log("壁纸切换时出现错误：" + loopEx.Message, true); goto AwaitSignal; }
 
                     AwaitSignal:
                         int index = WaitHandle.WaitAny(handles, Interval * 1000);

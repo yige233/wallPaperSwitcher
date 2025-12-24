@@ -3,6 +3,7 @@ using System.IO;
 using System.Text;
 using System.Net.Http;
 using System.Threading;
+using System.Reflection;
 using System.Diagnostics;
 using System.Windows.Forms;
 using System.Security.Principal;
@@ -29,28 +30,6 @@ namespace WallpaperSwitcher
     };
     public static class SystemUtils
     {
-        public static bool IsAdministrator()
-        {
-            var identity = WindowsIdentity.GetCurrent();
-            var principal = new WindowsPrincipal(identity);
-            return principal.IsInRole(WindowsBuiltInRole.Administrator);
-        }
-        public static void RunAsAdmin(string args, string errorText)
-        {
-            var exeName = Process.GetCurrentProcess().MainModule.FileName;
-            ProcessStartInfo startInfo = new ProcessStartInfo(exeName);
-            startInfo.Arguments = args;
-            startInfo.Verb = "runas";
-            startInfo.UseShellExecute = true;
-            try
-            {
-                Process.Start(startInfo);
-            }
-            catch (System.ComponentModel.Win32Exception)
-            {
-                MessageBox.Show(errorText, App.AppName + " - 需要管理员权限", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            }
-        }
         public static bool IsUserBusy()
         {
             if (IsLocked()) return true;
@@ -66,29 +45,6 @@ namespace WallpaperSwitcher
             if (IsFullScreen(hWnd)) return true;
 
             return false;
-        }
-        public static void SendEnterKey()
-        {
-            IntPtr hWnd = GetConsoleWindow();
-            if (hWnd != IntPtr.Zero) { PostMessage(hWnd, WM_KEYDOWN, (IntPtr)VK_RETURN, IntPtr.Zero); }
-        }
-        public static void RunCmdCommand(string fileName, string args)
-        {
-            Process process = new Process();
-            process.StartInfo.FileName = fileName;
-            process.StartInfo.Arguments = args;
-            process.StartInfo.UseShellExecute = false; // 必须为false才能重定向输出
-            process.StartInfo.RedirectStandardOutput = true;
-            process.StartInfo.RedirectStandardError = true; // 同时也捕获错误
-            process.StartInfo.CreateNoWindow = true; // 不显示黑框
-            process.Start();
-
-            string output = process.StandardOutput.ReadToEnd();
-            string error = process.StandardError.ReadToEnd();
-            process.WaitForExit();
-
-            if (!string.IsNullOrEmpty(output)) Console.WriteLine(String.Format("[{0}] {1}", fileName, output.Trim()));
-            if (!string.IsNullOrEmpty(error)) Console.WriteLine(String.Format("[{0} Error] {1}", fileName, error.Trim()));
         }
         public static bool IsLocked()
         {
@@ -264,61 +220,91 @@ namespace WallpaperSwitcher
         private const uint WM_KEYDOWN = 0x0100;
         private const int VK_RETURN = 0x0D;
     };
-    partial class App
+    public static class Downloader
     {
-        public static string GetConfigFilePath()
+        static Downloader()
         {
-            string envPath = Environment.GetEnvironmentVariable("WS_CONFIG");
-            if (!string.IsNullOrEmpty(envPath))
-            {
-                envPath = envPath.Trim('\"', '\'');
-                try
-                { return Path.Combine(Path.GetFullPath(envPath), "config.ini"); }
-                catch { }
-            }
-            return Path.Combine(BaseDir, "config.ini");
+            System.Net.ServicePointManager.SecurityProtocol = System.Net.SecurityProtocolType.Tls12;
         }
-        public static void Log(string msg = "", bool forceLog = false)
+        private static HttpClient CreateClient(bool useProxy)
         {
-            string line = "[" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "] " + msg;
-            if (isConsole) { Console.WriteLine(line); }
-            if (forceLog)
+            var handler = new HttpClientHandler
             {
-                File.AppendAllText(LogPath, line + "\r\n");
-                return;
-            }
+                UseProxy = useProxy,
+                Proxy = null // null = 使用系统/IE代理
+            };
+            var client = new HttpClient(handler);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(App.AppName + "/" + Assembly.GetExecutingAssembly().GetName().Version);
+            // 设置超时
+            client.Timeout = TimeSpan.FromSeconds(20);
+            return client;
+        }
+        public static byte[] Download(string url)
+        {
+            byte[] result;
             try
             {
+                using (var client = CreateClient(true))
+                {
+                    result = ExecuteDownload(client, url);
+                    return result;
+                }
+            }
+            catch (Exception ex) { LogDownloadError(url, ex, "下载失败"); }
+            try
+            {
+                using (var client = CreateClient(false))
+                {
+                    result = ExecuteDownload(client, url);
+                    return result;
+                }
+            }
+            catch (Exception ex) { LogDownloadError(url, ex, "直连下载失败"); }
+            return null;
+        }
+        private static byte[] ExecuteDownload(HttpClient client, string url)
+        {
+            HttpResponseMessage response = client.GetAsync(url).Result;
+            response.EnsureSuccessStatusCode();
+            string finalUrl = response.RequestMessage.RequestUri.ToString();
+            App.Log("正在下载URL：" + finalUrl);
+            using (Stream stream = response.Content.ReadAsStreamAsync().Result)
+            using (MemoryStream ms = new MemoryStream())
+            {
+                stream.CopyTo(ms);
+                return ms.ToArray();
+            }
+        }
+        private static void LogDownloadError(string url, Exception ex, string prefix)
+        {
+            AggregateException ae = ex as AggregateException;
+            if (ae != null)
+            {
+                App.Log(string.Format("{0} [{1}]: {2}", prefix, url, ae.Message), true);
+                foreach (var inner in ae.InnerExceptions) { App.Log(string.Format("  -> {0}: {1}", inner.GetType().Name, inner.Message), true); }
+            }
+            else { App.Log(string.Format("{0} [{1}]: {2}", prefix, url, ex.Message), true); }
+        }
+    }
+    partial class App
+    {
+        public static void Log(string msg = "", bool forceLog = false)
+        {
+            try
+            {
+                string line = "[" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "] " + msg;
+                if (isConsole) { Console.WriteLine(line); }
+                if (forceLog)
+                {
+                    File.AppendAllText(LogPath, line + "\r\n");
+                    return;
+                }
                 bool enableLog;
                 bool.TryParse(Config.Read("Log"), out enableLog);
                 if (!enableLog) return;
                 File.AppendAllText(LogPath, line + "\r\n");
             }
             catch { }
-        }
-
-        private static readonly HttpClient _httpClient = new HttpClient();
-        public static byte[] Download(string url)
-        {
-            try
-            {
-                HttpResponseMessage response = _httpClient.GetAsync(url).Result;
-                response.EnsureSuccessStatusCode();
-                string finalUrl = response.RequestMessage.RequestUri.ToString();
-                Log("真实URL：" + finalUrl);
-                return response.Content.ReadAsByteArrayAsync().Result;
-            }
-            catch (AggregateException ae)
-            {
-                Log("下载 " + url + " 失败: " + ae.Message, true);
-                foreach (var ex in ae.InnerExceptions)
-                {
-                    Log(string.Format("下载异常(内部): {0} - {1}", ex.GetType().Name, ex.Message), true);
-                    if (ex.InnerException != null) { Log(string.Format("  -> 根源: {0}", ex.InnerException.Message), true); }
-                }
-                return null;
-            }
-
         }
     }
 }

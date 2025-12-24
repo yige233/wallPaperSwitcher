@@ -82,10 +82,10 @@ namespace WallpaperSwitcher
         }
         public static bool SaveImage(string url, string savePath, long jpgQuality = 95L)
         {
-            bool success = false;
             try
             {
-                byte[] data = App.Download(url);
+                byte[] data = Downloader.Download(url);
+                if (data == null) return false;
                 string format = GetImageFormat(data);
 
                 if (format == "unknown")
@@ -98,14 +98,12 @@ namespace WallpaperSwitcher
                 {
                     if (jpgQuality == 100L) { SaveDirectly(data, savePath); }
                     else { SaveWithGDI(data, savePath, jpgQuality); }
-                    success = true;
                     return true;
                 }
 
                 if (IsExtraFormat(format))
                 {
                     SaveDirectly(data, savePath);
-                    success = true;
                     return true;
                 }
 
@@ -117,7 +115,12 @@ namespace WallpaperSwitcher
                 App.Log("保存 " + url + " 失败: " + ex.Message, true);
                 return false;
             }
-            finally { if (success) { GC.Collect(); GC.WaitForPendingFinalizers(); } }
+            finally
+            {
+                System.Runtime.GCSettings.LargeObjectHeapCompactionMode = System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce;
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+            }
         }
         private static void SaveWithGDI(byte[] data, string savePath, long jpgQuality)
         {

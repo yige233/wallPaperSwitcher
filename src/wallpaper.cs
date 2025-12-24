@@ -155,7 +155,7 @@ namespace WallpaperSwitcher
                     if (!Win32.CreateHardLink(p2, p1, IntPtr.Zero))
                     {
                         try { File.Copy(p1, p2, true); }
-                        catch (Exception ex) { Log("无法创建 wp1.jpg 的备份: " + ex.Message); }
+                        catch (Exception ex) { Log("无法创建 wp1.jpg 的备份: " + ex.Message, true); }
                     }
                 }
                 return true;

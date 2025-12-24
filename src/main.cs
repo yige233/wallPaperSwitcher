@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Net;
 using System.Text;
 using System.Threading;
 using System.Reflection;
@@ -17,13 +16,21 @@ namespace WallpaperSwitcher
         public static string SwitchEventName = "Global\\" + AppName + "SwitchEventSignal";
         public static string QuitEventName = "Global\\" + AppName + "QuitEventSignal";
         static string BaseDir = Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName);
-        static string LogPath = Path.Combine(BaseDir, "debug.log");
+        static string LogPath = Path.Combine(BaseDir, AppName + ".log");
         static string ConfigPath = GetConfigFilePath();
+        static Mutex appMutex;
         public static bool isConsole = Win32.AttachConsole(Win32.ATTACH_PARENT_PROCESS);
-        static void ManualSwitchWallpaper()
+        public static string GetConfigFilePath()
         {
-            try { using (var wh = EventWaitHandle.OpenExisting(SwitchEventName)) { wh.Set(); } }
-            catch { }
+            string envPath = Environment.GetEnvironmentVariable("WS_CONFIG");
+            if (!string.IsNullOrEmpty(envPath))
+            {
+                envPath = envPath.Trim('\"', '\'');
+                try
+                { return Path.Combine(Path.GetFullPath(envPath), "config.ini"); }
+                catch { }
+            }
+            return Path.Combine(BaseDir, "config.ini");
         }
         static void QuitService()
         {
@@ -52,27 +59,18 @@ namespace WallpaperSwitcher
                 // 2. 初始化 Config 类
                 Config.Init(ConfigPath, configSchema, "Settings");
 
-                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
-                _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(AppName + "/" + Assembly.GetExecutingAssembly().GetName().Version);
                 string flag = args.Length > 0 ? args[0] : "";
                 string value = args.Length > 1 ? args[1] : "";
+
+                if (isConsole) { Console.WriteLine(""); }
+
                 if (flag == "-c" || flag == "--config")
                 {
-                    if (value == "")
-                    {
-                        Console.WriteLine("\n" + Config.Text());
-                        return;
-                    }
+                    if (value == "") { Console.WriteLine(Config.Text()); return; }
 
                     string configName = value.Split('=')[0];
                     string ConfigValue = value.Split('=')[1];
                     Config.Write(configName, ConfigValue);
-
-                    return;
-                }
-                if (flag == "-s" || flag == "--switch")
-                {
-                    ManualSwitchWallpaper();
                     return;
                 }
                 if (flag == "-q" || flag == "--quit")
@@ -91,20 +89,32 @@ namespace WallpaperSwitcher
                         "",
                         "参数:",
                         "-c, --config [<path>=<value>]      修改配置文件。如果不添加第二个参数，则是打开配置文件。",
-                        "-s, --switch                       手动切换壁纸。",
                         "-q, --quit                         退出正在运行的后台服务。",
                         "-h, --help                         显示帮助。",
-                        "不使用任何参数，即为启动后台服务。",
+                        "不使用任何参数，即为启动后台服务。若已经存在一个正在运行的后台服务，则执行手动切换壁纸。",
                     };
-                    MessageBox.Show(string.Join("\n", help), AppName + " - 帮助", MessageBoxButtons.OK);
+                    foreach (string line in help) { Console.WriteLine(line); }
                     return;
                 }
-                if (isConsole) { Console.WriteLine("\n" + AppName + " v" + Assembly.GetExecutingAssembly().GetName().Version + "\n使用 -h 参数查看帮助。"); }
-                if (flag == "") { RunServiceMode(); }
+                if (isConsole) { Console.WriteLine(AppName + " v" + Assembly.GetExecutingAssembly().GetName().Version + "\n使用 -h 参数查看帮助。"); }
+                if (flag == "")
+                {
+                    bool createdNew;
+                    appMutex = new Mutex(true, "Global\\" + AppName + "ServiceMutex", out createdNew);
+                    // 如果已经运行，则触发切换壁纸信号，然后退出
+                    if (!createdNew)
+                    {
+                        try { using (var wh = EventWaitHandle.OpenExisting(SwitchEventName)) { wh.Set(); } }
+                        catch { }
+                        return;
+                    }
+                    RunServiceMode();
+                }
             }
-            finally
+            catch (Exception ex)
             {
-                SystemUtils.SendEnterKey();
+                if (isConsole) { Console.WriteLine(ex); }
+                Log(ex.Message, true);
             }
         }
     }
