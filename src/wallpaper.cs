@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 
 namespace WallpaperSwitcher
+
 {
     [StructLayout(LayoutKind.Sequential)] public struct Rect { public int Left; public int Top; public int Right; public int Bottom; }
     [ComImport, Guid("43826d1e-e718-42ee-bc55-a1e261c37bfe"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)] public interface IShellItem { }
@@ -15,24 +16,97 @@ namespace WallpaperSwitcher
         void SetWallpaper(string monitorID, string wallpaper); string GetWallpaper(string monitorID); string GetMonitorDevicePathAt(uint monitorIndex); uint GetMonitorDevicePathCount(); void GetMonitorRECT(string monitorID, out Rect displayRect); void SetBackgroundColor(uint color); uint GetBackgroundColor(); void SetPosition(int position); int GetPosition();
         void SetSlideshow(IShellItemArray items); void GetSlideshow(out IShellItemArray items); void SetSlideshowOptions(int options, uint slideshowTick); void GetSlideshowOptions(out int options, out uint slideshowTick); void AdvanceSlideshow(string monitorID, int direction); void GetStatus(out int state); bool Enable(bool enable);
     }
-    public class WallpaperEngine
+    public delegate void WallpaperChangeHandler();
+    public delegate void ActionDelegate();
+
+    public static class WallpaperEngine
+
     {
         [DllImport("shell32.dll", CharSet = CharSet.Unicode, PreserveSig = true)]
         public static extern int SHCreateItemFromParsingName(string pszPath, IntPtr pbc, ref Guid riid, [MarshalAs(UnmanagedType.Interface)] out IShellItem ppv);
         [DllImport("shell32.dll", PreserveSig = true)]
         public static extern int SHCreateShellItemArrayFromShellItem([MarshalAs(UnmanagedType.Interface)] IShellItem psi, ref Guid riid, [MarshalAs(UnmanagedType.Interface)] out IShellItemArray ppsiItemArray);
+        private static string _themePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"Microsoft\Windows\Themes");
+        private static FileSystemWatcher _globalWatcher;
+        private static volatile bool _isInternalChange = false;
+        private static WallpaperChangeHandler _onUserActionCallback;
+        private static DateTime _lastUserEventTime = DateTime.MinValue;
+        private static string SystemWallpaper = "TranscodedWallpaper";
+        public static void OnUserChange(WallpaperChangeHandler callback)
+        {
+            _onUserActionCallback = callback;
+            if (Directory.Exists(_themePath))
+            {
+                // 初始化常驻监听器
+                _globalWatcher = new FileSystemWatcher(_themePath);
+                _globalWatcher.Filter = SystemWallpaper;
+                _globalWatcher.NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.CreationTime;
+                _globalWatcher.Changed += new FileSystemEventHandler(OnGlobalWatcherChanged);
+                _globalWatcher.EnableRaisingEvents = true;
+            }
+        }
+        private static void OnGlobalWatcherChanged(object sender, FileSystemEventArgs e)
+        {
+
+            if (_isInternalChange) { return; }
+            if (DateTime.Now.Subtract(_lastUserEventTime).TotalMilliseconds < 1000) return;
+            _lastUserEventTime = DateTime.Now;
+
+            if (_onUserActionCallback != null) _onUserActionCallback();
+        }
+        private static void ExecuteWithInternalListener(ActionDelegate action)
+        {
+            _isInternalChange = true;
+
+            FileSystemWatcher tempWatcher = new FileSystemWatcher(_themePath);
+            tempWatcher.Filter = SystemWallpaper;
+            tempWatcher.NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.CreationTime;
+
+            int handledState = 0;
+
+            tempWatcher.Changed += delegate (object sender, FileSystemEventArgs e)
+            {
+                if (Interlocked.Exchange(ref handledState, 1) == 1) return;
+                Thread.Sleep(500);
+                _isInternalChange = false;
+                try
+                {
+                    tempWatcher.EnableRaisingEvents = false;
+                    tempWatcher.Dispose();
+                }
+                catch { }
+            };
+            new Thread(delegate ()
+            {
+                Thread.Sleep(4000);
+                if (Interlocked.Exchange(ref handledState, 1) == 0)
+                {
+                    _isInternalChange = false;
+                    try
+                    {
+                        tempWatcher.EnableRaisingEvents = false;
+                        tempWatcher.Dispose();
+                    }
+                    catch { }
+                }
+            }).Start();
+            tempWatcher.EnableRaisingEvents = true; if (action != null) action();
+        }
         public static void SetFolder(string path)
         {
-            Type type = Type.GetTypeFromCLSID(new Guid("C2CF3110-460E-4fc1-B9D0-8A1C0C9CC4BD"));
-            IDesktopWallpaper wallpaper = (IDesktopWallpaper)Activator.CreateInstance(type);
-            Guid gItem = new Guid("43826d1e-e718-42ee-bc55-a1e261c37bfe"); Guid gArr = new Guid("B63EA76D-1F85-456F-A19C-48159EFA858B");
-            IShellItem item;
-            int hr = SHCreateItemFromParsingName(path, IntPtr.Zero, ref gItem, out item);
-            if (hr != 0) throw new Exception("SHCreateItem failed: " + hr);
-            IShellItemArray arr;
-            hr = SHCreateShellItemArrayFromShellItem(item, ref gArr, out arr);
-            if (hr != 0) throw new Exception("SHCreateShellItemArray failed: " + hr);
-            wallpaper.SetSlideshow(arr);
+            ExecuteWithInternalListener(delegate ()
+            {
+                Type type = Type.GetTypeFromCLSID(new Guid("C2CF3110-460E-4fc1-B9D0-8A1C0C9CC4BD"));
+                IDesktopWallpaper wallpaper = (IDesktopWallpaper)Activator.CreateInstance(type);
+                Guid gItem = new Guid("43826d1e-e718-42ee-bc55-a1e261c37bfe"); Guid gArr = new Guid("B63EA76D-1F85-456F-A19C-48159EFA858B");
+                IShellItem item;
+                int hr = SHCreateItemFromParsingName(path, IntPtr.Zero, ref gItem, out item);
+                if (hr != 0) throw new Exception(string.Format("SHCreateItem failed: {0}", hr));
+                IShellItemArray arr;
+                hr = SHCreateShellItemArrayFromShellItem(item, ref gArr, out arr);
+                if (hr != 0) throw new Exception(string.Format("SHCreateShellItemArray failed: {0}", hr));
+                wallpaper.SetSlideshow(arr);
+            });
         }
     }
     public class LockScreen
@@ -117,7 +191,7 @@ namespace WallpaperSwitcher
             // 0 = Started
             while (info.Status == 0) { Thread.Sleep(100); }
             // 3 = Error
-            if (info.Status == 3) { throw new Exception("设置锁屏操作失败。错误代码: " + info.ErrorCode); }
+            if (info.Status == 3) { throw new Exception(string.Format("设置锁屏操作失败。错误代码: {0}", info.ErrorCode)); }
         }
         // --- 手动定义 COM 接口 (欺骗编译器，绕过 WinMD) ---
         [ComImport]
@@ -134,8 +208,15 @@ namespace WallpaperSwitcher
     };
     partial class App
     {
-        static bool PrepareWallpaper(string targetDir, string url)
+        static bool PrepareWallpaper(string targetDir)
         {
+
+            string ImageUrl = Config.Read("ImageUrl");
+            if (string.IsNullOrEmpty(ImageUrl))
+            {
+                LogForce("准备壁纸失败: 需要提供 ImageUrl");
+                return false;
+            }
             string p1 = Path.Combine(targetDir, "wp1.jpg");
             string p2 = Path.Combine(targetDir, "wp2.jpg");
             try { File.Delete(p1); } catch { }
@@ -149,19 +230,19 @@ namespace WallpaperSwitcher
             try
             {
                 if (!Directory.Exists(targetDir)) { Directory.CreateDirectory(targetDir); }
-                if (!Image.SaveImage(url, p1, jpgQuality)) { return false; }
+                if (!Image.SaveImage(ImageUrl, p1, jpgQuality)) { return false; }
                 if (!Win32.CreateSymbolicLink(p2, p1, Win32.SYMBOLIC_LINK_FLAG_FILE | Win32.SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE))
                 {
                     if (!Win32.CreateHardLink(p2, p1, IntPtr.Zero))
                     {
                         try { File.Copy(p1, p2, true); }
-                        catch (Exception ex) { Log("无法创建 wp1.jpg 的备份: " + ex.Message, true); }
+                        catch (Exception ex) { LogForce("无法创建 wp1.jpg 的备份: {0}", ex.Message); }
                     }
                 }
                 return true;
             }
             catch (Exception ex)
-            { Log("准备壁纸失败: " + ex, true); return false; }
+            { LogForce("准备壁纸失败: {0}", ex.ToString()); return false; }
         }
 
     }

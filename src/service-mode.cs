@@ -15,10 +15,9 @@ namespace WallpaperSwitcher
             {
                 // 确保关键配置项存在
                 string BasePathRaw = Config.Read("BasePath");
-                string ImageUrl = Config.Read("ImageUrl");
-                if (string.IsNullOrEmpty(BasePathRaw) || string.IsNullOrEmpty(ImageUrl))
+                if (string.IsNullOrEmpty(BasePathRaw))
                 {
-                    MessageBox.Show("需要提供BasePath和ImageUrl。" + ConfigPath, AppName, MessageBoxButtons.OK, MessageBoxIcon.Stop);
+                    MessageBox.Show("配置文件中需要提供BasePath。", AppName, MessageBoxButtons.OK, MessageBoxIcon.Stop);
                     Process.Start(ConfigPath);
                     return;
                 }
@@ -54,12 +53,12 @@ namespace WallpaperSwitcher
                             // 检查目标文件夹是否为空，若为空，则立即准备壁纸，若准备壁纸失败，则放弃后续操作。
                             if (Directory.GetFiles(targetPath, "*.jpg").Length == 0)
                             {
-                                if (!PrepareWallpaper(targetPath, ImageUrl))
+                                if (!PrepareWallpaper(targetPath))
                                 {
                                     int retryAfter;
                                     int.TryParse(Config.Read("RetryAfter"), out retryAfter);
                                     Interval = retryAfter;
-                                    Log(NextSlotName + "未就绪，放弃切换壁纸。预计将在 " + retryAfter + " 秒后重试。");
+                                    Log("{0} 未就绪，放弃切换壁纸。预计将在 {1} 秒后重试。", NextSlotName, retryAfter);
                                     goto AwaitSignal;
                                 }
                             }
@@ -71,8 +70,8 @@ namespace WallpaperSwitcher
                             bool.TryParse(Config.Read("LockScreen"), out enableLockScreen);
                             if (enableLockScreen)
                             {
-                                if (!File.Exists(WallpaperPath)) { Log("文件不存在：" + WallpaperPath + " ，无法将其设置为锁屏壁纸。"); }
-                                if (Image.IsExtraFormat(Image.GetImageFormat(WallpaperPath))) { Log(WallpaperPath + " 为webp格式图片，无法将其设置为锁屏壁纸。"); }
+                                if (!File.Exists(WallpaperPath)) { LogForce("文件不存在: {0} ，无法将其设置为锁屏壁纸。", WallpaperPath); }
+                                if (Image.IsExtraFormat(Image.GetImageFormat(WallpaperPath))) { LogForce("{0} 为webp格式图片，无法将其设置为锁屏壁纸。", WallpaperPath); }
                                 else { LockScreen.SetWallpaper(WallpaperPath); }
                             }
                             // 交换变量
@@ -81,10 +80,10 @@ namespace WallpaperSwitcher
                             NextSlotName = temp;
 
                             Config.Write("CurrentSlot", CurrentSlotName);
-                            if (!PrepareWallpaper((NextSlotName == "Slot_1") ? Slot1 : Slot2, ImageUrl)) { Log("后台预加载 " + NextSlotName + " 未完成。将在下个周期重试。"); }
+                            if (!PrepareWallpaper((NextSlotName == "Slot_1") ? Slot1 : Slot2)) { Log("后台预加载 {0} 未完成。将在下个周期重试。", NextSlotName); }
 
                         }
-                        catch (Exception loopEx) { Log("壁纸切换时出现错误：" + loopEx.Message, true); goto AwaitSignal; }
+                        catch (Exception loopEx) { LogForce("壁纸切换时出现错误: {0}", loopEx.Message); goto AwaitSignal; }
 
                     AwaitSignal:
                         int index = WaitHandle.WaitAny(handles, Interval * 1000);
@@ -94,7 +93,7 @@ namespace WallpaperSwitcher
                     }
                 }
             }
-            catch (Exception ex) { Log("FATAL: " + ex.ToString(), true); }
+            catch (Exception ex) { LogForce("后台服务运行时出现关键错误: {0}", ex.ToString()); }
         }
     }
 }

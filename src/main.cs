@@ -13,8 +13,14 @@ namespace WallpaperSwitcher
     partial class App
     {
         public static string AppName = "WallpaperSwitcher";
-        public static string SwitchEventName = "Global\\" + AppName + "SwitchEventSignal";
-        public static string QuitEventName = "Global\\" + AppName + "QuitEventSignal";
+        private static Assembly currentAssembly = Assembly.GetExecutingAssembly();
+        public static string AppDesc = currentAssembly.GetCustomAttribute<AssemblyDescriptionAttribute>().Description;
+        public static string ExecutableName = currentAssembly.GetName().Name;
+        public static string AppVersion = currentAssembly.GetName().Version.ToString();
+        public static string GithubURL = "https://github.com/yige233/wallPaperSwitcher";
+        public static string SwitchEventName = string.Format("Global\\{0}SwitchEventSignal", AppName);
+        public static string QuitEventName = string.Format("Global\\{0}QuitEventSignal", AppName);
+        public static string ServiceMutex = string.Format("Global\\{0}ServiceMutex", AppName);
         static string BaseDir = Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName);
         static string LogPath = Path.Combine(BaseDir, AppName + ".log");
         static string ConfigPath = GetConfigFilePath();
@@ -26,16 +32,18 @@ namespace WallpaperSwitcher
             if (!string.IsNullOrEmpty(envPath))
             {
                 envPath = envPath.Trim('\"', '\'');
-                try
-                { return Path.Combine(Path.GetFullPath(envPath), "config.ini"); }
+                try { return Path.Combine(Path.GetFullPath(envPath), "config.ini"); }
                 catch { }
             }
             return Path.Combine(BaseDir, "config.ini");
         }
         static void QuitService()
         {
-            try { using (var wh = EventWaitHandle.OpenExisting(QuitEventName)) { wh.Set(); } }
-            catch { }
+            try { using (var wh = EventWaitHandle.OpenExisting(QuitEventName)) { wh.Set(); } } catch { }
+        }
+        static void ManualSwitchWallpaper()
+        {
+            try { using (var wh = EventWaitHandle.OpenExisting(SwitchEventName)) { wh.Set(); } } catch { }
         }
         [STAThread]
         static void Main(string[] args)
@@ -66,7 +74,12 @@ namespace WallpaperSwitcher
 
                 if (flag == "-c" || flag == "--config")
                 {
-                    if (value == "") { Console.WriteLine(Config.Text()); return; }
+                    if (value == "")
+                    {
+                        if (isConsole) { Console.WriteLine(Config.Text()); }
+                        else { Process.Start(ConfigPath); }
+                        return;
+                    }
 
                     string configName = value.Split('=')[0];
                     string ConfigValue = value.Split('=')[1];
@@ -79,42 +92,48 @@ namespace WallpaperSwitcher
                     MessageBox.Show(AppName + " 已不再运行。", AppName, MessageBoxButtons.OK);
                     return;
                 }
-                if (flag == "-h" || flag == "--help")
+                if (flag == "-j" || flag == "--jumplist")
                 {
-                    string[] help = new string[]
-                    {
-                        AppName + " v" + Assembly.GetExecutingAssembly().GetName().Version,
-                        "",
-                        "用法: " + AppName + " [参数]",
-                        "",
-                        "参数:",
-                        "-c, --config [<path>=<value>]      修改配置文件。如果不添加第二个参数，则是打开配置文件。",
-                        "-q, --quit                         退出正在运行的后台服务。",
-                        "-h, --help                         显示帮助。",
-                        "不使用任何参数，即为启动后台服务。若已经存在一个正在运行的后台服务，则执行手动切换壁纸。",
-                    };
-                    foreach (string line in help) { Console.WriteLine(line); }
+                    JumpListInjector.Run(Process.GetCurrentProcess().MainModule.FileName);
                     return;
                 }
-                if (isConsole) { Console.WriteLine(AppName + " v" + Assembly.GetExecutingAssembly().GetName().Version + "\n使用 -h 参数查看帮助。"); }
+                if (flag == "-h" || flag == "--help")
+                {
+                    string format = @"{0} v{1}
+{2}
+用法: {3} [参数]
+
+参数:
+-c, --config [<path>=<value>]      修改配置文件。如果不添加第二个参数，则是打开配置文件。
+-j, --jumplist                     为固定到任务栏的快捷方式设置跳转列表，
+-q, --quit                         退出正在运行的后台服务。
+-h, --help                         显示帮助。
+不使用任何参数，即为启动后台服务。若已经存在一个正在运行的后台服务，则执行手动切换壁纸。";
+                    string help = string.Format(format, AppName, AppVersion, AppDesc, ExecutableName);
+                    if (isConsole) { Console.WriteLine(help); }
+                    else { Process.Start(GithubURL); }
+                    return;
+                }
+                if (isConsole) { Console.WriteLine("{0} v{1}\n使用 -h 参数查看帮助。", AppName, AppVersion); }
                 if (flag == "")
                 {
                     bool createdNew;
-                    appMutex = new Mutex(true, "Global\\" + AppName + "ServiceMutex", out createdNew);
+                    appMutex = new Mutex(true, ServiceMutex, out createdNew);
+
                     // 如果已经运行，则触发切换壁纸信号，然后退出
-                    if (!createdNew)
-                    {
-                        try { using (var wh = EventWaitHandle.OpenExisting(SwitchEventName)) { wh.Set(); } }
-                        catch { }
-                        return;
-                    }
+                    if (!createdNew) { ManualSwitchWallpaper(); return; }
+
+                    // 监听 %AppData%\Microsoft\Windows\Themes\TranscodedWallpaper，也就是壁纸缓存文件的变化。若产生变化，
+                    // 说明用户点击了桌面右键菜单中的“下一个桌面背景”,我们触发自己的切换壁纸逻辑，覆盖掉系统的实际上并无作用的壁纸切换。
+                    WallpaperEngine.OnUserChange(new WallpaperChangeHandler(ManualSwitchWallpaper));
+
                     RunServiceMode();
                 }
             }
             catch (Exception ex)
             {
                 if (isConsole) { Console.WriteLine(ex); }
-                Log(ex.Message, true);
+                LogForce("程序运行时出现致命错误: {0}", ex.ToString());
             }
         }
     }

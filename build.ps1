@@ -56,7 +56,7 @@ try {
     $Results = $CodeProvider.CompileAssemblyFromFile($Params, [string[]]$SourceFiles)
 
     if ($Results.Errors.HasErrors) {
-        Write-Error "`n编译失败！详情如下："
+        Write-Error "`n编译失败！详情如下: "
         foreach ($Err in $Results.Errors) {
             $FileName = Split-Path $Err.FileName -Leaf
             $Msg = "[{0}:{1}] {2}" -f $FileName, $Err.Line, $Err.ErrorText

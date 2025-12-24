@@ -91,7 +91,7 @@ namespace WallpaperSwitcher
                 if (format == "unknown")
                 {
                     string headHex = BitConverter.ToString(data.Take(8).ToArray());
-                    App.Log(string.Format("未知文件：{0}", headHex), true);
+                    App.LogForce("未知文件: {0}", headHex);
                     return false;
                 }
                 if (IsSafeFormat(format))
@@ -107,12 +107,12 @@ namespace WallpaperSwitcher
                     return true;
                 }
 
-                App.Log(string.Format("不支持的文件格式：{0}", format), true);
+                App.LogForce("不支持的文件格式: {0}", format);
                 return false;
             }
             catch (Exception ex)
             {
-                App.Log("保存 " + url + " 失败: " + ex.Message, true);
+                App.LogForce("保存 {0} 失败: {1}", url, ex.Message);
                 return false;
             }
             finally

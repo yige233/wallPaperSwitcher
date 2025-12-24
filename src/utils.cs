@@ -65,7 +65,7 @@ namespace WallpaperSwitcher
             mi.cbSize = Marshal.SizeOf(mi);
             if (!GetMonitorInfo(hMonitor, ref mi)) return false;
 
-            // 判定逻辑：窗口边缘是否贴合或超出显示器物理边缘
+            // 判定逻辑: 窗口边缘是否贴合或超出显示器物理边缘
             return appRect.Top <= mi.rcMonitor.Top &&
                     appRect.Left <= mi.rcMonitor.Left &&
                     appRect.Bottom >= mi.rcMonitor.Bottom &&
@@ -234,7 +234,7 @@ namespace WallpaperSwitcher
                 Proxy = null // null = 使用系统/IE代理
             };
             var client = new HttpClient(handler);
-            client.DefaultRequestHeaders.UserAgent.ParseAdd(App.AppName + "/" + Assembly.GetExecutingAssembly().GetName().Version);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(string.Format("{0}/{1}", App.AppName, App.AppVersion));
             // 设置超时
             client.Timeout = TimeSpan.FromSeconds(20);
             return client;
@@ -267,7 +267,7 @@ namespace WallpaperSwitcher
             HttpResponseMessage response = client.GetAsync(url).Result;
             response.EnsureSuccessStatusCode();
             string finalUrl = response.RequestMessage.RequestUri.ToString();
-            App.Log("正在下载URL：" + finalUrl);
+            App.Log("正在下载URL: {0}", finalUrl);
             using (Stream stream = response.Content.ReadAsStreamAsync().Result)
             using (MemoryStream ms = new MemoryStream())
             {
@@ -280,31 +280,40 @@ namespace WallpaperSwitcher
             AggregateException ae = ex as AggregateException;
             if (ae != null)
             {
-                App.Log(string.Format("{0} [{1}]: {2}", prefix, url, ae.Message), true);
-                foreach (var inner in ae.InnerExceptions) { App.Log(string.Format("  -> {0}: {1}", inner.GetType().Name, inner.Message), true); }
+                App.LogForce("{0} [{1}]: {2}", prefix, url, ae.Message);
+                foreach (var inner in ae.InnerExceptions) { App.LogForce("  -> {0}: {1}", inner.GetType().Name, inner.Message); }
             }
-            else { App.Log(string.Format("{0} [{1}]: {2}", prefix, url, ex.Message), true); }
+            else { App.LogForce("{0} [{1}]: {2}", prefix, url, ex.Message); }
         }
     }
     partial class App
     {
-        public static void Log(string msg = "", bool forceLog = false)
+        public static bool LogEnabled()
         {
-            try
-            {
-                string line = "[" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "] " + msg;
-                if (isConsole) { Console.WriteLine(line); }
-                if (forceLog)
-                {
-                    File.AppendAllText(LogPath, line + "\r\n");
-                    return;
-                }
-                bool enableLog;
-                bool.TryParse(Config.Read("Log"), out enableLog);
-                if (!enableLog) return;
-                File.AppendAllText(LogPath, line + "\r\n");
-            }
-            catch { }
+            bool enableLog = false;
+            bool.TryParse(Config.Read("Log"), out enableLog);
+            return enableLog;
+        }
+        public static void Log(string format, params object[] args)
+        {
+            if (!LogEnabled()) return;
+            string line = string.Format(format, args);
+            if (isConsole) { Console.WriteLine(line); }
+            File.AppendAllText(LogPath, line + "\r\n");
+        }
+
+        public static void LogForce(string format, params object[] args)
+        {
+            string line = string.Format(format, args);
+            if (isConsole) { Console.WriteLine(line); }
+            File.AppendAllText(LogPath, line + "\r\n");
+        }
+        private static string FormatLog(string format, object[] args)
+        {
+            string userMsg = (args == null || args.Length == 0) ? format : string.Format(format, args);
+            string timeStr = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            return string.Format("[{0}] {1}", timeStr, userMsg);
         }
     }
+
 }

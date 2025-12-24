@@ -155,7 +155,7 @@ namespace WallpaperSwitcher
                     string content = Text();
                     File.WriteAllText(_iniPath, content, Encoding.Unicode);
                 }
-                catch (Exception ex) { App.Log("保存全部配置失败: " + ex.Message, true); }
+                catch (Exception ex) { App.LogForce("保存全部配置失败: {0}", ex.Message); }
             }
         }
     }
