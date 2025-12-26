@@ -47,8 +47,17 @@ namespace WallpaperSwitcher
                             int UserIdleThresholdSeconds;
                             int.TryParse(Config.Read("IdleThresholdSeconds"), out UserIdleThresholdSeconds);
 
-                            if (SystemUtils.IsUserBusy() || !SystemUtils.IsMonitorActive()) { Log("当前处于全屏/锁屏/显示器休眠状态，不更新壁纸。"); goto AwaitSignal; }
-                            if (SystemUtils.IsUserIdle(UserIdleThresholdSeconds)) { Log("当前用户处于空闲状态，不更新壁纸。"); goto AwaitSignal; }
+                            Func<string> TryGetReason = delegate ()
+                            {
+                                if (Utils.IsUserBusy()) { return "全屏"; }
+                                if (Utils.IsLocked()) { return "锁屏"; }
+                                if (Utils.IsUserIdle(UserIdleThresholdSeconds)) { return "用户空闲"; }
+                                // “处于远程桌面”和“显示器处于活动状态”都不成立，我们认为用户连接到了本地会话，且显示器处于关闭状态，那么放弃更新壁纸。
+                                if (!(Utils.IsRDPSession() || Utils.IsMonitorActivated())) { return "显示器休眠"; }
+                                return null;
+                            };
+                            string skipReason = TryGetReason();
+                            if (skipReason != null) { Log("当前处于 {0} 状态，不更新壁纸。", skipReason); goto AwaitSignal; }
 
                             string targetPath = (NextSlotName == "Slot_1") ? Slot1 : Slot2;
                             // 检查目标文件夹是否为空，若为空，则立即准备壁纸，若准备壁纸失败，则放弃后续操作。

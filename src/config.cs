@@ -26,13 +26,6 @@ namespace WallpaperSwitcher
     }
     public static class Config
     {
-        // --- 1. P/Invoke 声明 (强制 Unicode) ---
-        [DllImport("kernel32", CharSet = CharSet.Unicode)]
-        private static extern long WritePrivateProfileString(string section, string key, string val, string filePath);
-
-        [DllImport("kernel32", CharSet = CharSet.Unicode)]
-        private static extern int GetPrivateProfileString(string section, string key, string def, StringBuilder retVal, int size, string filePath);
-
         private static string _iniPath;
         private static string _defaultSection;
         private static Dictionary<string, ConfigItem> _items = new Dictionary<string, ConfigItem>(StringComparer.OrdinalIgnoreCase);
@@ -77,7 +70,7 @@ namespace WallpaperSwitcher
             {
                 ConfigItem item = kvp.Value;
                 StringBuilder sb = new StringBuilder(2048);
-                GetPrivateProfileString(item.Section, item.Key, item.DefaultValue, sb, 2048, _iniPath);
+                Kernel32.GetPrivateProfileString(item.Section, item.Key, item.DefaultValue, sb, 2048, _iniPath);
                 item.CurrentValue = sb.ToString();
             }
         }
@@ -88,7 +81,7 @@ namespace WallpaperSwitcher
             if (_items.TryGetValue(path, out item))
             {
                 StringBuilder sb = new StringBuilder(2048);
-                GetPrivateProfileString(item.Section, item.Key, item.CurrentValue, sb, 2048, _iniPath);
+                Kernel32.GetPrivateProfileString(item.Section, item.Key, item.CurrentValue, sb, 2048, _iniPath);
                 string val = sb.ToString();
                 item.CurrentValue = val;
                 return val;
@@ -117,7 +110,7 @@ namespace WallpaperSwitcher
                 }
             }
             if (!File.Exists(_iniPath)) File.WriteAllText(_iniPath, "", Encoding.Unicode);
-            WritePrivateProfileString(section, key, value, _iniPath);
+            Kernel32.WritePrivateProfileString(section, key, value, _iniPath);
         }
 
         public static string Text()

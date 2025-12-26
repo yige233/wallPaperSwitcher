@@ -22,10 +22,6 @@ namespace WallpaperSwitcher
     public static class WallpaperEngine
 
     {
-        [DllImport("shell32.dll", CharSet = CharSet.Unicode, PreserveSig = true)]
-        public static extern int SHCreateItemFromParsingName(string pszPath, IntPtr pbc, ref Guid riid, [MarshalAs(UnmanagedType.Interface)] out IShellItem ppv);
-        [DllImport("shell32.dll", PreserveSig = true)]
-        public static extern int SHCreateShellItemArrayFromShellItem([MarshalAs(UnmanagedType.Interface)] IShellItem psi, ref Guid riid, [MarshalAs(UnmanagedType.Interface)] out IShellItemArray ppsiItemArray);
         private static string _themePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"Microsoft\Windows\Themes");
         private static FileSystemWatcher _globalWatcher;
         private static volatile bool _isInternalChange = false;
@@ -52,8 +48,8 @@ namespace WallpaperSwitcher
             if (DateTime.Now.Subtract(_lastUserEventTime).TotalMilliseconds < 1000) return;
 
             // 我们严格限制回调响应此事件的场景：一定是ShellWindow获得焦点时，才允许响应此事件
-            IntPtr hWnd = SystemUtils.GetForegroundWindow();
-            if (hWnd != SystemUtils.GetShellWindow()) return;
+            IntPtr hWnd = User32.GetForegroundWindow();
+            if (hWnd != User32.GetShellWindow()) return;
 
             _lastUserEventTime = DateTime.Now;
 
@@ -105,10 +101,10 @@ namespace WallpaperSwitcher
                 IDesktopWallpaper wallpaper = (IDesktopWallpaper)Activator.CreateInstance(type);
                 Guid gItem = new Guid("43826d1e-e718-42ee-bc55-a1e261c37bfe"); Guid gArr = new Guid("B63EA76D-1F85-456F-A19C-48159EFA858B");
                 IShellItem item;
-                int hr = SHCreateItemFromParsingName(path, IntPtr.Zero, ref gItem, out item);
+                int hr = Shell32.SHCreateItemFromParsingName(path, IntPtr.Zero, ref gItem, out item);
                 if (hr != 0) throw new Exception(string.Format("SHCreateItem failed: {0}", hr));
                 IShellItemArray arr;
-                hr = SHCreateShellItemArrayFromShellItem(item, ref gArr, out arr);
+                hr = Shell32.SHCreateShellItemArrayFromShellItem(item, ref gArr, out arr);
                 if (hr != 0) throw new Exception(string.Format("SHCreateShellItemArray failed: {0}", hr));
                 wallpaper.SetSlideshow(arr);
             });
@@ -236,9 +232,9 @@ namespace WallpaperSwitcher
             {
                 if (!Directory.Exists(targetDir)) { Directory.CreateDirectory(targetDir); }
                 if (!Image.SaveImage(ImageUrl, p1, jpgQuality)) { return false; }
-                if (!Win32.CreateSymbolicLink(p2, p1, Win32.SYMBOLIC_LINK_FLAG_FILE | Win32.SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE))
+                if (!Kernel32.CreateSymbolicLink(p2, p1, Kernel32.SYMBOLIC_LINK_FLAG_FILE | Kernel32.SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE))
                 {
-                    if (!Win32.CreateHardLink(p2, p1, IntPtr.Zero))
+                    if (!Kernel32.CreateHardLink(p2, p1, IntPtr.Zero))
                     {
                         try { File.Copy(p1, p2, true); }
                         catch (Exception ex) { LogForce("无法创建 wp1.jpg 的备份: {0}", ex.Message); }

@@ -26,7 +26,7 @@ namespace WallpaperSwitcher
         public static string LogPath = Path.Combine(BaseDir, AppName + ".log");
         static string ConfigPath = GetConfigFilePath();
         static Mutex appMutex;
-        public static bool isConsole = Win32.AttachConsole(Win32.ATTACH_PARENT_PROCESS);
+        public static bool isConsole = Kernel32.AttachConsole(Kernel32.ATTACH_PARENT_PROCESS);
         public static string GetConfigFilePath()
         {
             string envPath = Environment.GetEnvironmentVariable("WS_CONFIG");
@@ -127,7 +127,7 @@ namespace WallpaperSwitcher
                     // 监听 %AppData%\Microsoft\Windows\Themes\TranscodedWallpaper，也就是壁纸缓存文件的变化。若产生变化，
                     // 说明用户点击了桌面右键菜单中的“下一个桌面背景”,我们触发自己的切换壁纸逻辑，覆盖掉系统的实际上并无作用的壁纸切换。
                     WallpaperEngine.OnUserChange(new WallpaperChangeHandler(ManualSwitchWallpaper));
-
+                    Utils.StartMonitorListening();
                     RunServiceMode();
                 }
             }
