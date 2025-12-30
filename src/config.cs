@@ -30,9 +30,12 @@ namespace WallpaperSwitcher
         private static string _defaultSection;
         private static Dictionary<string, ConfigItem> _items = new Dictionary<string, ConfigItem>(StringComparer.OrdinalIgnoreCase);
         private static object _lock = new object();
-
+        private static FileSystemWatcher _configWatcher;
         public static void Init(string iniPath, List<ConfigItem> items, string defaultSectionTag = "Settings")
         {
+            string directory = Path.GetDirectoryName(iniPath);
+            string filename = Path.GetFileName(iniPath);
+
             _iniPath = iniPath;
             _defaultSection = defaultSectionTag;
             _items.Clear();
@@ -47,8 +50,16 @@ namespace WallpaperSwitcher
             }
             if (File.Exists(_iniPath)) { RefreshFromDisk(); }
             else { WriteAll(); }
-        }
 
+            // 监听配置文件，更新时同步更新内存中的值。如果启动监听后内部会用到write()，需要上锁防止死循环
+            _configWatcher = new FileSystemWatcher(directory);
+            _configWatcher.Filter = filename;
+            _configWatcher.NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.CreationTime;
+            _configWatcher.Changed += new FileSystemEventHandler(OnConfigFileChanged);
+            _configWatcher.EnableRaisingEvents = true;
+
+        }
+        private static void OnConfigFileChanged(object sender, FileSystemEventArgs e) { RefreshFromDisk(); }
         private static void ParsePath(ConfigItem item)
         {
             int dotIndex = item.Path.IndexOf('.');
@@ -78,19 +89,13 @@ namespace WallpaperSwitcher
         public static string Read(string path)
         {
             ConfigItem item;
-            if (_items.TryGetValue(path, out item))
-            {
-                StringBuilder sb = new StringBuilder(2048);
-                Kernel32.GetPrivateProfileString(item.Section, item.Key, item.CurrentValue, sb, 2048, _iniPath);
-                string val = sb.ToString();
-                item.CurrentValue = val;
-                return val;
-            }
+            if (_items.TryGetValue(path, out item)) { return item.CurrentValue; }
             return "";
         }
 
         public static void Write(string path, string value)
         {
+            if (!File.Exists(_iniPath)) { WriteAll(); return; }
             string section = _defaultSection;
             string key = path;
             ConfigItem item;
@@ -109,7 +114,6 @@ namespace WallpaperSwitcher
                     key = path.Substring(dotIndex + 1);
                 }
             }
-            if (!File.Exists(_iniPath)) File.WriteAllText(_iniPath, "", Encoding.Unicode);
             Kernel32.WritePrivateProfileString(section, key, value, _iniPath);
         }
 
