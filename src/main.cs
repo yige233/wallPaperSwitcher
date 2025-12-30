@@ -18,9 +18,6 @@ namespace WallpaperSwitcher
         public static string ExecutableName = currentAssembly.GetName().Name;
         public static string AppVersion = currentAssembly.GetName().Version.ToString();
         public static string GithubURL = "https://github.com/yige233/wallPaperSwitcher";
-        public static string SwitchEventName = string.Format("Global\\{0}SwitchEventSignal", AppName);
-        public static string QuitEventName = string.Format("Global\\{0}QuitEventSignal", AppName);
-        public static string ServiceMutex = string.Format("Global\\{0}ServiceMutex", AppName);
         public static string ExecutablePath = Process.GetCurrentProcess().MainModule.FileName;
         public static string BaseDir = Path.GetDirectoryName(ExecutablePath);
         public static string LogPath = Path.Combine(BaseDir, AppName + ".log");
@@ -38,20 +35,17 @@ namespace WallpaperSwitcher
             }
             return Path.Combine(BaseDir, "config.ini");
         }
-        static void QuitService()
+        public static bool IsBackgroundRunning()
         {
-            try { using (var wh = EventWaitHandle.OpenExisting(QuitEventName)) { wh.Set(); } } catch { }
-        }
-        static void ManualSwitchWallpaper()
-        {
-            try { using (var wh = EventWaitHandle.OpenExisting(SwitchEventName)) { wh.Set(); } } catch { }
+            bool createdNew;
+            appMutex = new Mutex(true, string.Format("Global\\{0}ServiceMutex", AppName), out createdNew);
+            return !createdNew;
         }
         [STAThread]
         static void Main(string[] args)
         {
             try
             {
-                // 1. 定义配置大纲 (Schema)
                 var configSchema = new List<ConfigItem>()
                 {
                 new ConfigItem("BasePath", "要存放壁纸的文件夹路径。"),
@@ -65,14 +59,40 @@ namespace WallpaperSwitcher
                 new ConfigItem("RetryAfter", "后台准备壁纸失败后，重试的间隔（秒）。","60"),
                 new ConfigItem("CurrentSlot", "当前壁纸使用的槽位。不要自行修改。")
                 };
-                // 2. 初始化 Config 类
                 Config.Init(ConfigPath, configSchema, "Settings");
+
+                var Events = new List<EventInit>()
+                {
+                    new EventInit("quit"),
+                    new EventInit("switch"),
+                    new EventInit("view", delegate
+                    {
+                        string WallpaperPath = Path.Combine(Config.Read("BasePath"), Config.Read("CurrentSlot"), "wp1.jpg");
+                        if (File.Exists(WallpaperPath)) { Process.Start(WallpaperPath); } else { MessageBox.Show("无法打开当前的壁纸文件。", AppName, MessageBoxButtons.OK); }
+                    }),
+                    new EventInit("openURL", delegate
+                    {
+                        if (!string.IsNullOrEmpty(currentWallpaperURL)) { Process.Start(currentWallpaperURL); } else { MessageBox.Show("当前壁纸URL没有被记录。", AppName, MessageBoxButtons.OK); }
+                    }),
+                };
 
                 string flag = args.Length > 0 ? args[0] : "";
                 string value = args.Length > 1 ? args[1] : "";
 
+                if (flag == "--signal")
+                {
+                    if (!IsBackgroundRunning()) { MessageBox.Show("无法执行操作：后台服务没有运行。", AppName, MessageBoxButtons.OK); return; }
+                    if (value == "view") { SignalManager.Trigger("view"); return; }
+                    if (value == "openURL") { SignalManager.Trigger("openURL"); return; }
+                    return;
+                }
+                if (flag == "-q" || flag == "--quit")
+                {
+                    SignalManager.Trigger("quit");
+                    MessageBox.Show(AppName + " 已不再运行。", AppName, MessageBoxButtons.OK);
+                    return;
+                }
                 if (isConsole) { Console.WriteLine(""); }
-
                 if (flag == "-c" || flag == "--config")
                 {
                     if (value == "")
@@ -85,12 +105,7 @@ namespace WallpaperSwitcher
                     string configName = value.Split('=')[0];
                     string ConfigValue = value.Split('=')[1];
                     Config.Write(configName, ConfigValue);
-                    return;
-                }
-                if (flag == "-q" || flag == "--quit")
-                {
-                    QuitService();
-                    MessageBox.Show(AppName + " 已不再运行。", AppName, MessageBoxButtons.OK);
+                    Kernel32.FreeConsole();
                     return;
                 }
                 if (flag == "-j" || flag == "--jumplist")
@@ -118,15 +133,15 @@ namespace WallpaperSwitcher
                 if (isConsole) { Console.WriteLine("{0} v{1}\n使用 -h 参数查看帮助。", AppName, AppVersion); }
                 if (flag == "")
                 {
-                    bool createdNew;
-                    appMutex = new Mutex(true, ServiceMutex, out createdNew);
 
                     // 如果已经运行，则触发切换壁纸信号，然后退出
-                    if (!createdNew) { ManualSwitchWallpaper(); return; }
+                    if (IsBackgroundRunning()) { SignalManager.Trigger("switch"); return; }
+
+                    SignalManager.Init(Events);
 
                     // 监听 %AppData%\Microsoft\Windows\Themes\TranscodedWallpaper，也就是壁纸缓存文件的变化。若产生变化，
                     // 说明用户点击了桌面右键菜单中的“下一个桌面背景”,我们触发自己的切换壁纸逻辑，覆盖掉系统的实际上并无作用的壁纸切换。
-                    WallpaperEngine.OnUserChange(new WallpaperChangeHandler(ManualSwitchWallpaper));
+                    WallpaperEngine.OnUserChange(delegate { SignalManager.Trigger("switch"); });
                     Utils.StartMonitorListening();
                     RunServiceMode();
                 }
@@ -135,6 +150,10 @@ namespace WallpaperSwitcher
             {
                 if (isConsole) { Console.WriteLine(ex); }
                 LogForce("程序运行时出现致命错误: {0}", ex.ToString());
+            }
+            finally
+            {
+                SignalManager.Cleanup();
             }
         }
     }

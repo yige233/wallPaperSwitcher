@@ -18,19 +18,16 @@ namespace WallpaperSwitcher
         void SetWallpaper(string monitorID, string wallpaper); string GetWallpaper(string monitorID); string GetMonitorDevicePathAt(uint monitorIndex); uint GetMonitorDevicePathCount(); void GetMonitorRECT(string monitorID, out Rect displayRect); void SetBackgroundColor(uint color); uint GetBackgroundColor(); void SetPosition(int position); int GetPosition();
         void SetSlideshow(IShellItemArray items); void GetSlideshow(out IShellItemArray items); void SetSlideshowOptions(int options, uint slideshowTick); void GetSlideshowOptions(out int options, out uint slideshowTick); void AdvanceSlideshow(string monitorID, int direction); void GetStatus(out int state); bool Enable(bool enable);
     }
-    public delegate void WallpaperChangeHandler();
-    public delegate void ActionDelegate();
-
     public static class WallpaperEngine
 
     {
         private static string _themePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"Microsoft\Windows\Themes");
         private static FileSystemWatcher _globalWatcher;
         private static volatile bool _isInternalChange = false;
-        private static WallpaperChangeHandler _onUserActionCallback;
+        private static Action _onUserActionCallback;
         private static DateTime _lastUserEventTime = DateTime.MinValue;
         private static string SystemWallpaper = "TranscodedWallpaper";
-        public static void OnUserChange(WallpaperChangeHandler callback)
+        public static void OnUserChange(Action callback)
         {
             _onUserActionCallback = callback;
             if (Directory.Exists(_themePath))
@@ -65,7 +62,7 @@ namespace WallpaperSwitcher
             _lastUserEventTime = DateTime.Now;
             if (_onUserActionCallback != null) _onUserActionCallback();
         }
-        private static void ExecuteWithInternalListener(ActionDelegate action)
+        private static void ExecuteWithInternalListener(Action action)
         {
             _isInternalChange = true;
 

@@ -4,6 +4,7 @@ using System.Threading;
 using System.Reflection;
 using System.Collections;
 using System.Diagnostics;
+using System.Collections.Generic;
 
 namespace WallpaperSwitcher
 {
@@ -60,19 +61,20 @@ namespace WallpaperSwitcher
                 tJumpList.GetProperty("ShowRecentCategory").SetValue(listInstance, false, null);
 
                 object jumpItemsCollection = tJumpList.GetProperty("JumpItems").GetValue(listInstance, null);
-                System.Collections.IList jumpItemsList = jumpItemsCollection as System.Collections.IList;
+                IList jumpItemsList = jumpItemsCollection as IList;
 
-                object taskSwitch = CreateTask(tJumpTask, "启动/切换下一张壁纸", "立即更换锁屏壁纸", App.ExecutablePath);
-                object taskConfig = CreateTask(tJumpTask, "编辑配置", "打开并编辑配置文件", App.GetConfigFilePath());
-                object taskOpenLog = CreateTask(tJumpTask, "打开日志", "打开日志文件", App.LogPath);
-                object taskQuit = CreateTask(tJumpTask, "停止服务", "停止后台运行中的服务", App.ExecutablePath, "-q");
-                object taskAbout = CreateTask(tJumpTask, "关于", string.Format("关于{0}", App.AppName), App.GithubURL);
+                var tasks = new List<object>
+                {
+                    CreateTask(tJumpTask, "启动/切换下一张壁纸", "立即更换锁屏壁纸", App.ExecutablePath),
+                    CreateTask(tJumpTask, "编辑配置", "打开并编辑配置文件", App.GetConfigFilePath()),
+                    CreateTask(tJumpTask, "打开日志", "打开日志文件", App.LogPath),
+                    CreateTask(tJumpTask, "查看当前壁纸", "需要后台程序正在运行。", App.ExecutablePath, "--signal view"),
+                    CreateTask(tJumpTask, "查看当前壁纸URL", "需要后台程序正在运行。", App.ExecutablePath, "--signal openURL"),
+                    CreateTask(tJumpTask, "停止服务", "停止后台运行中的服务", App.ExecutablePath, "-q"),
+                    CreateTask(tJumpTask, "关于", string.Format("关于{0}", App.AppName), App.GithubURL)
+                };
 
-                jumpItemsList.Add(taskSwitch);
-                jumpItemsList.Add(taskConfig);
-                jumpItemsList.Add(taskOpenLog);
-                jumpItemsList.Add(taskQuit);
-                jumpItemsList.Add(taskAbout);
+                foreach (var task in tasks) { jumpItemsList.Add(task); }
 
                 MethodInfo setJumpListMethod = tJumpList.GetMethod("SetJumpList", BindingFlags.Static | BindingFlags.Public);
                 setJumpListMethod.Invoke(null, new object[] { appInstance, listInstance });

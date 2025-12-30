@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Reflection;
 using System.Diagnostics;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
 namespace WallpaperSwitcher
@@ -235,10 +236,12 @@ namespace WallpaperSwitcher
     };
     public static class Downloader
     {
+        private static string _lastURL;
         static Downloader()
         {
             System.Net.ServicePointManager.SecurityProtocol = System.Net.SecurityProtocolType.Tls12;
         }
+        public static string LastURL { get { return _lastURL; } }
         private static HttpClient CreateClient(bool useProxy)
         {
             var handler = new HttpClientHandler
@@ -279,8 +282,8 @@ namespace WallpaperSwitcher
         {
             HttpResponseMessage response = client.GetAsync(url).Result;
             response.EnsureSuccessStatusCode();
-            string finalUrl = response.RequestMessage.RequestUri.ToString();
-            App.Log("正在下载URL: {0}", finalUrl);
+            _lastURL = response.RequestMessage.RequestUri.ToString();
+            App.Log("正在下载URL: {0}", _lastURL);
             using (Stream stream = response.Content.ReadAsStreamAsync().Result)
             using (MemoryStream ms = new MemoryStream())
             {
@@ -297,6 +300,74 @@ namespace WallpaperSwitcher
                 foreach (var inner in ae.InnerExceptions) { App.LogForce("  -> {0}: {1}", inner.GetType().Name, inner.Message); }
             }
             else { App.LogForce("{0} [{1}]: {2}", prefix, url, ex.Message); }
+        }
+    }
+    public class EventInit
+    {
+        public string Name { get; private set; }
+        public string FullName { get; private set; }
+        public Action Callback { get; private set; }
+        public EventInit(string name, Action callback = null)
+        {
+            Name = name;
+            FullName = string.Format("Global\\{0}{1}EventSignal", App.AppName, name);
+            Callback = callback;
+        }
+    }
+
+    public static class SignalManager
+    {
+        private static Dictionary<string, EventWaitHandle> _handleMap = new Dictionary<string, EventWaitHandle>();
+        private static List<RegisteredWaitHandle> _registeredCallbacks = new List<RegisteredWaitHandle>();
+
+        public static void Init(List<EventInit> events)
+        {
+            foreach (var item in events)
+            {
+                EventWaitHandle handle = new EventWaitHandle(false, EventResetMode.AutoReset, item.FullName);
+
+                if (_handleMap.ContainsKey(item.Name)) { _handleMap[item.Name] = handle; }
+                else { _handleMap.Add(item.Name, handle); }
+
+                if (item.Callback != null)
+                {
+                    Action action = item.Callback;
+                    RegisteredWaitHandle reg = ThreadPool.RegisterWaitForSingleObject(
+                        handle,
+                        new WaitOrTimerCallback(delegate (object state, bool timedOut)
+                        {
+                            if (!timedOut && action != null)
+                            {
+                                try { action(); }
+                                catch (Exception ex) { App.Log("事件 {0} 的回调执行失败: {1}", item.Name, ex.Message); }
+                            }
+                        }),
+                        null, -1, false
+                    );
+                    _registeredCallbacks.Add(reg);
+                }
+            }
+        }
+
+        public static void Trigger(string shortName)
+        {
+            EventWaitHandle handle;
+            if (_handleMap.TryGetValue(shortName, out handle)) { handle.Set(); return; }
+            string fullName = string.Format("Global\\{0}{1}EventSignal", App.AppName, shortName);
+            try { using (EventWaitHandle wh = EventWaitHandle.OpenExisting(fullName)) { wh.Set(); } } catch { }
+        }
+        public static WaitHandle GetHandle(string shortName)
+        {
+            if (_handleMap.ContainsKey(shortName))
+                return _handleMap[shortName];
+            throw new Exception(string.Format("未找到信号定义: {0}", shortName));
+        }
+        public static void Cleanup()
+        {
+            foreach (var reg in _registeredCallbacks) reg.Unregister(null);
+            foreach (var kvp in _handleMap) kvp.Value.Close();
+            _registeredCallbacks.Clear();
+            _handleMap.Clear();
         }
     }
     partial class App
