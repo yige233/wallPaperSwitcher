@@ -39,7 +39,6 @@ namespace WallpaperSwitcher
         public static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
         [StructLayout(LayoutKind.Sequential)]
         public struct LASTINPUTINFO { public uint cbSize; public uint dwTime; }
-
         [DllImport("user32.dll")]
         public static extern IntPtr GetForegroundWindow();
         [DllImport("user32.dll")]
@@ -122,7 +121,6 @@ namespace WallpaperSwitcher
             User32.CloseDesktop(hDesktop);
             return false;
         }
-
         public static bool IsFullScreen(IntPtr hWnd)
         {
             User32.RECT appRect;
@@ -140,17 +138,18 @@ namespace WallpaperSwitcher
                     appRect.Bottom >= mi.rcMonitor.Bottom &&
                     appRect.Right >= mi.rcMonitor.Right;
         }
-
+        public static string GetProcClassName(IntPtr hWnd)
+        {
+            StringBuilder sb = new StringBuilder(256);
+            User32.GetClassName(hWnd, sb, sb.Capacity);
+            return sb.ToString();
+        }
         private static bool IsDesktopOrShell(IntPtr hWnd)
         {
             // 检查特殊句柄
             if (hWnd == User32.GetShellWindow()) return true;
-
             // 检查类名
-            StringBuilder sb = new StringBuilder(256);
-            User32.GetClassName(hWnd, sb, sb.Capacity);
-            string className = sb.ToString();
-
+            string className = GetProcClassName(hWnd);
             // WorkerW / Progman = 桌面背景 Shell_TrayWnd = 任务栏
             return className == "WorkerW" || className == "Progman" || className == "Shell_TrayWnd";
         }
@@ -313,20 +312,25 @@ namespace WallpaperSwitcher
             if (!LogEnabled()) return;
             string line = FormatLog(format, args);
             if (isConsole) { Console.WriteLine(line); }
-            File.AppendAllText(LogPath, line + "\r\n");
+            WriteLog(line);
         }
 
         public static void LogForce(string format, params object[] args)
         {
             string line = FormatLog(format, args);
             if (isConsole) { Console.WriteLine(line); }
-            File.AppendAllText(LogPath, line + "\r\n");
+            WriteLog(line);
         }
         private static string FormatLog(string format, object[] args)
         {
             string userMsg = (args == null || args.Length == 0) ? format : string.Format(format, args);
             string timeStr = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
             return string.Format("[{0}] {1}", timeStr, userMsg);
+        }
+        private static void WriteLog(string msg)
+        {
+            try { File.AppendAllText(LogPath, msg + "\r\n"); }
+            catch { }
         }
     }
 

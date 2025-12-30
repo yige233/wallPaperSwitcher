@@ -1,7 +1,9 @@
 using System;
 using System.IO;
+using Microsoft.Win32;
 using System.Threading;
 using System.Reflection;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace WallpaperSwitcher
@@ -43,16 +45,24 @@ namespace WallpaperSwitcher
         }
         private static void OnGlobalWatcherChanged(object sender, FileSystemEventArgs e)
         {
+            if (_isInternalChange) return;
 
-            if (_isInternalChange) { return; }
-            if (DateTime.Now.Subtract(_lastUserEventTime).TotalMilliseconds < 1000) return;
+            // 防抖阈值设置为3s
+            if (DateTime.Now.Subtract(_lastUserEventTime).TotalMilliseconds < 3000) return;
 
-            // 我们严格限制回调响应此事件的场景：一定是ShellWindow获得焦点时，才允许响应此事件
+            if (!IsSlideshowMode()) return;
+
+            // 前台窗口句柄与shellWindow句柄一致，通过
             IntPtr hWnd = User32.GetForegroundWindow();
-            if (hWnd != User32.GetShellWindow()) return;
+            if (hWnd == User32.GetShellWindow()) { EmitCallback(); return; }
 
+            string className = Utils.GetProcClassName(hWnd);
+            // 焦点窗口是桌面，通过
+            if (className == "Progman" || className == "WorkerW") { EmitCallback(); return; }
+        }
+        private static void EmitCallback()
+        {
             _lastUserEventTime = DateTime.Now;
-
             if (_onUserActionCallback != null) _onUserActionCallback();
         }
         private static void ExecuteWithInternalListener(ActionDelegate action)
@@ -108,6 +118,22 @@ namespace WallpaperSwitcher
                 if (hr != 0) throw new Exception(string.Format("SHCreateShellItemArray failed: {0}", hr));
                 wallpaper.SetSlideshow(arr);
             });
+        }
+        private static bool IsSlideshowMode()
+        {
+            try
+            {
+                // 幻灯片模式下，HKEY_CURRENT_USER\Control Panel\Desktop\Wallpaper的值是固定的
+                string SlideshowWallpaper = Path.Combine(_themePath, SystemWallpaper);
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"Control Panel\Desktop"))
+                {
+                    if (key == null) return false;
+                    object value = key.GetValue("Wallpaper");
+                    return SlideshowWallpaper == value.ToString();
+                }
+            }
+            catch { }
+            return false;
         }
     }
     public class LockScreen
