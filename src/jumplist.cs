@@ -4,6 +4,7 @@ using System.Threading;
 using System.Reflection;
 using System.Collections;
 using System.Diagnostics;
+using System.Windows.Forms;
 using System.Collections.Generic;
 
 namespace WallpaperSwitcher
@@ -23,16 +24,9 @@ namespace WallpaperSwitcher
         {
             try
             {
-                App.LogForce("正在加载 WPF 组件...");
-
                 Assembly assemblyPF = Assembly.Load("PresentationFramework, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35");
                 Assembly assemblyBase = Assembly.Load("WindowsBase, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35");
-
-                if (assemblyPF == null || assemblyBase == null)
-                {
-                    App.LogForce("错误: 无法加载 WPF 程序集。请确认已安装 .NET Framework。");
-                    return;
-                }
+                if (assemblyPF == null || assemblyBase == null) { App.LogForce("错误: 无法加载 WPF 程序集。请确认已安装 .NET Framework。"); return; }
 
                 Type tShutdownMode = assemblyPF.GetType("System.Windows.ShutdownMode");
                 Type tApplication = assemblyPF.GetType("System.Windows.Application");
@@ -40,11 +34,7 @@ namespace WallpaperSwitcher
                 Type tJumpTask = assemblyPF.GetType("System.Windows.Shell.JumpTask");
                 Type tJumpItem = assemblyPF.GetType("System.Windows.Shell.JumpItem");
 
-                if (tApplication == null || tJumpList == null || tJumpTask == null)
-                {
-                    App.LogForce("错误: 无法解析 WPF 类型。");
-                    return;
-                }
+                if (tApplication == null || tJumpList == null || tJumpTask == null) { App.LogForce("错误: 无法解析 WPF 类型。"); return; }
 
                 object appInstance = tApplication.GetProperty("Current").GetValue(null, null);
 
@@ -81,7 +71,7 @@ namespace WallpaperSwitcher
 
                 tJumpList.GetMethod("Apply").Invoke(listInstance, null);
 
-                App.LogForce("JumpList 更新成功。");
+                MessageBox.Show("JumpList 更新成功。\n现在你可以将此程序固定到任务栏，以快速访问快捷任务。", App.AppName, MessageBoxButtons.OK);
             }
             catch (Exception ex)
             {
@@ -89,7 +79,6 @@ namespace WallpaperSwitcher
                 if (ex.InnerException != null) App.LogForce(" - {0}", ex.InnerException.Message);
             }
         }
-
         /// <summary>
         /// 通过反射创建 JumpTask 对象
         /// </summary>
