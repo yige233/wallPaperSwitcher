@@ -51,7 +51,7 @@ namespace WallpaperSwitcher
                 new ConfigItem("BasePath", "要存放壁纸的文件夹路径。"),
                 new ConfigItem("ImageUrl", "壁纸图片的URL。"),
                 new ConfigItem("LockScreen", "是否同时将当前壁纸设为锁屏壁纸。", "true"),
-                new ConfigItem("IntervalSeconds", "壁纸切换间隔（秒）。", "300"),
+                new ConfigItem("IntervalSeconds", "壁纸切换间隔（秒）。如果小于10，程序将会在设置完壁纸后立即退出。", "300"),
                 new ConfigItem("IdleThresholdSeconds", "用户空闲时间（秒）。超过该时间后，将停止切换壁纸。", "3600"),
                 new ConfigItem("ExtraFormat", "允许作为桌面壁纸的图像格式。支持webp,heic,avif。若包含多个值，使用英文逗号分隔。"),
                 new ConfigItem("Log", "是否启用日志。", "false"),

@@ -39,7 +39,6 @@ namespace WallpaperSwitcher
                 while (true)
                 {
                     int.TryParse(Config.Read("IntervalSeconds"), out Interval);
-                    if (Interval < 10) { Interval = 10; }
                     try
                     {
                         int UserIdleThresholdSeconds;
@@ -95,6 +94,7 @@ namespace WallpaperSwitcher
                     catch (Exception loopEx) { LogForce("壁纸切换时出现错误: {0}", loopEx.Message); goto AwaitSignal; }
 
                 AwaitSignal:
+                    if (Interval < 10) { break; }
                     int index = WaitHandle.WaitAny(handles, Interval * 1000);
                     if (index == 0) { Log("收到了退出信号，程序已不再运行。"); ; break; }
                     if (index == 1) { Log("触发了手动壁纸切换。"); continue; }
